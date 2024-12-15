@@ -49,6 +49,7 @@ public class PlayerMovement : MonoBehaviour
     /// Used for collision checks and smooth gameplay
     /// </summary>
     private float lastFrameXPosition;
+    private float lastFrameYPosition;
 
     private bool isGrounded = true;
     private bool isCoyotte = false;
@@ -196,6 +197,19 @@ public class PlayerMovement : MonoBehaviour
         }
             //Check if new position overlaps (Y) Floor
             Collider2D floorCollision = Physics2D.OverlapBox(new Vector2(transform.position.x, newFrameYFloorCheckCenterPosition), new Vector2(BoxXCollisionSize, BoxYFloorCollisionCheck), 0f, LayerToIgnoreFloorCollision);
+
+        if (!isGrounded && PlayerMovementValues.SpeedY < -0.1f)
+        {
+            Vector2 newPos = new Vector2(transform.position.x, newFrameYFloorCheckCenterPosition);
+            Vector2 oldPos = new Vector2(lastFrameXPosition, lastFrameYPosition - BoxYFloorPosition) ;
+
+            RaycastHit2D rayBox = Physics2D.BoxCast(newPos, new Vector2(BoxXCollisionSize, BoxYFloorCollisionCheck), 0, newPos - oldPos, Vector2.Distance(newPos, oldPos));
+            if(rayBox.collider != null)
+            {
+                floorCollision = rayBox.collider;
+            }
+        }
+
         // If we there is floor collision and we are in the air (Usually landing after we jumped) Land
         if (floorCollision == null || (floorCollision.gameObject.layer == 6 && fallThrough))
         {
@@ -221,6 +235,7 @@ public class PlayerMovement : MonoBehaviour
 
         //Update position for this frame (X)
         float newFrameXPosition = this.transform.position.x + PlayerMovementValues.SpeedX;
+
         // Dash
         if (isDash)
         {
@@ -308,6 +323,7 @@ public class PlayerMovement : MonoBehaviour
 
         // Save new position
         lastFrameXPosition = newFrameXPosition;
+        lastFrameYPosition = newFrameYPosition;
     }
 
     
