@@ -12,8 +12,8 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] float JumpingImpulse = 5;
     [SerializeField] float GravityValue = -5;
     [SerializeField] int CoyotteTime = 5;
+    [SerializeField] int curCoyotteTime = 0;
     [SerializeField] int CurrentOrientation = -1;
-    private bool wasCoyotteUsedInTimer = false;
 
     [SerializeField, Header("Dash Movement Values")]
      float DashTime = 0.5f;
@@ -161,12 +161,13 @@ public class PlayerMovement : MonoBehaviour
         // Coyotte timer
         if(isCoyotte)
         {
-            CoyotteTime--;
-            if (CoyotteTime <= 0)
+            curCoyotteTime++;
+            if (CoyotteTime <= curCoyotteTime)
             {
-                isCoyotte = false;
-                isCoyotteEnded = true;
-            }
+                    isCoyotte = false;
+                    isCoyotteEnded = true;
+                    curCoyotteTime = 0;
+                }
             }
 
         if(!isWallClimb)
@@ -214,7 +215,7 @@ public class PlayerMovement : MonoBehaviour
             isCoyotteEnded = false;
             hasJumped = false;
             canDash = true;
-            CoyotteTime = 5;
+
             animator.SetBool("animIsJumping", false);
         }
 
@@ -236,7 +237,6 @@ public class PlayerMovement : MonoBehaviour
                 isDash = false;
                 PlayerMovementValues.SpeedY = 0;
             }
-
         }
 
         // Checking for the head collision
@@ -257,7 +257,7 @@ public class PlayerMovement : MonoBehaviour
             isWallClimb = false;
             canWallJump = false;
             isCoyotte = true;
-            CoyotteTime = 5;
+
             animator.SetBool("animWallWait", false);
         }
 
