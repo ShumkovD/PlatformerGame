@@ -10,6 +10,7 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField, Header("Normal Movement Values")]
                             float HorizontalMovementSpeedMultiplier = 0.1f;
     [SerializeField] float JumpingImpulse = 5;
+    [SerializeField] float minJumpingPower = 0.5f;
     [SerializeField] float GravityValue = -5;
     [SerializeField] int CoyotteTime = 5;
     [SerializeField] int curCoyotteTime = 0;
@@ -60,6 +61,7 @@ public class PlayerMovement : MonoBehaviour
     private bool fallThrough = false;
     private bool isWallClimb = false;
     private bool canWallJump = false;
+    private bool jumpEndEarly = false;
     /// <summary>
     /// Used to communicate between Update and Fixed Update functions
     /// </summary>
@@ -147,9 +149,29 @@ public class PlayerMovement : MonoBehaviour
             }
 
             // If Space key is up and player movement speed is more than minimal jump speed, then stop getting velocity
-            if (Input.GetKeyUp(KeyCode.Space) && hasJumped && PlayerMovementValues.SpeedY > 0)
+            if (Input.GetKeyUp(KeyCode.Space) && hasJumped)
+            {
+                if (PlayerMovementValues.SpeedY > minJumpingPower)
+                {
+                    jumpEndEarly = true;
+                }
+                else
+                {
+                    if (PlayerMovementValues.SpeedY > 0)
+                    {
+                        PlayerMovementValues.SpeedY = 0;
+                    }
+                }
+            }
+
+        }
+
+        if(jumpEndEarly)
+        {
+            if(PlayerMovementValues.SpeedY <= minJumpingPower)
             {
                 PlayerMovementValues.SpeedY = 0;
+                jumpEndEarly = false;
             }
         }
 
@@ -293,6 +315,8 @@ public class PlayerMovement : MonoBehaviour
 
             // Dash acceleration
             newFrameXPosition = this.transform.position.x + HorizontalMovementSpeedMultiplier * DashSpeedMultiplier * FixedOrientation;
+
+            canWallJump = false;
 
             currentDashTime += Time.deltaTime;
             if (currentDashTime > DashTime)
