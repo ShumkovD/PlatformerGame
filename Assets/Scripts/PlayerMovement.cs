@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Security.Cryptography.X509Certificates;
 using UnityEngine;
+using static UnityEditor.Experimental.GraphView.GraphView;
 
 
 public class PlayerMovement : MonoBehaviour
@@ -37,6 +39,9 @@ public class PlayerMovement : MonoBehaviour
 
     float HandReachYHeight = 1.2f;
     private int WallOrientation = 0;
+
+
+    private int AttackOrientation = 0;
     #endregion
 
    public  int LayerToIgnoreHeadCollision = 6;
@@ -62,6 +67,8 @@ public class PlayerMovement : MonoBehaviour
     private bool isWallClimb = false;
     private bool canWallJump = false;
     private bool jumpEndEarly = false;
+    private bool isAtacking = false;
+    private bool hasAtackingEnded = false;
     /// <summary>
     /// Used to communicate between Update and Fixed Update functions
     /// </summary>
@@ -97,12 +104,10 @@ public class PlayerMovement : MonoBehaviour
         // Set orientation of the player sprite and remember it
         if( PlayerMovementValues.SpeedX < 0)
         {
-            spriteRenderer.flipX = true;
             CurrentOrientation = -1;
         }
         if (PlayerMovementValues.SpeedX > 0)
         {
-            spriteRenderer.flipX = false;
             CurrentOrientation = 1;
         }
 
@@ -198,11 +203,46 @@ public class PlayerMovement : MonoBehaviour
         }
 
 
+        if(Input.GetMouseButtonDown(0)&& isGrounded && !isDash)
+        {
+            animator.SetTrigger("isAttack");
+            animator.SetBool("hasAttackEnded", false);
+            isAtacking = true;
+            // Set attack Orientation to be the same with the looking position
+            AttackOrientation = CurrentOrientation;
+        }
+
+        // If atacking lock the orientation until end
+        if(isAtacking)
+        {
+            CurrentOrientation = AttackOrientation;
+        }
+
+        // Here we change the sprite orientation
+        if (CurrentOrientation > 0)
+        {
+            spriteRenderer.flipX = false;
+        }
+        else
+        {
+            spriteRenderer.flipX = true;
+        }
+
     }
 
     // Physics and movement
     private void FixedUpdate()
     {
+
+        if(isAtacking)
+        {
+            if(animator.GetCurrentAnimatorStateInfo(0).IsName("Attack 1") && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.95f)
+            {
+                animator.SetBool("hasAttackEnded", true);
+                isAtacking = false;
+            }
+            return;
+        }
 
         // Update Jumping Speed (Y)
         PlayerMovementValues.SpeedY  += GravityValue * Time.deltaTime; // Because time squared
