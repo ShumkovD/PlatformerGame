@@ -35,7 +35,7 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField, Header("Wall Climbing")]
 
     float HandReachYHeight = 1.2f;
-    private float WallOrientation = 0;
+    private int WallOrientation = 0;
     #endregion
 
    public  int LayerToIgnoreHeadCollision = 6;
@@ -83,11 +83,16 @@ public class PlayerMovement : MonoBehaviour
     // Inputs
     private void Update()
     {
+        // Player Speed Inputs
         PlayerMovementValues.SpeedX = Input.GetAxisRaw("Horizontal") * HorizontalMovementSpeedMultiplier;
 
+        // Player Dash Speed modulation (When dashing, inputs are off)
         if(isDash)
-        { PlayerMovementValues.SpeedX = 0; }
+        {
+            PlayerMovementValues.SpeedX = 0;
+        }
 
+        // Set orientation of the player sprite and remember it
         if( PlayerMovementValues.SpeedX < 0)
         {
             spriteRenderer.flipX = true;
@@ -99,6 +104,7 @@ public class PlayerMovement : MonoBehaviour
             CurrentOrientation = 1;
         }
 
+        // Change animation to run if Speed is not 0
         if (PlayerMovementValues.SpeedX != 0)
         {
             animator.SetBool("animIsRunning", true);
@@ -110,42 +116,64 @@ public class PlayerMovement : MonoBehaviour
             animator.SetBool("animIsIdle", true);
         }
 
-
+        // If pressed S,
         if (Input.GetKey(KeyCode.S))
         {
+            //And space, while on the ground and not dashing, 
             if (Input.GetKeyDown(KeyCode.Space) && isGrounded && !isDash)
             {
+                // Fall through
                 fallThrough = true;
             }
         }
         else
         {
+            // If S is not pressed, when pressing space and in jumpable state
             if (Input.GetKeyDown(KeyCode.Space) && (isGrounded || isCoyotte || canWallJump))
             {
+                // Jump
                 PlayerMovementValues.SpeedY = JumpingImpulse;
                 animator.SetBool("animIsJumping", true);
+                // If jumping you are not on the ground
                 isGrounded = false;
+                // You have jumped
                 hasJumped = true;
+                // You are not on the wall anymore
                 isWallClimb = false;
+                // You cannot jump from the said wall
                 canWallJump = false;
+                // Coyotte time is not applicabel as well
                 isCoyotte = false;
             }
 
+            // If Space key is up and player movement speed is more than minimal jump speed, then stop getting velocity
             if (Input.GetKeyUp(KeyCode.Space) && hasJumped && PlayerMovementValues.SpeedY > 0)
             {
                 PlayerMovementValues.SpeedY = 0;
             }
         }
-        if(Input.GetKeyDown (KeyCode.LeftShift)&&!isDash && canDash)
+
+        // If left shift is pressed and can dash, dash!
+        if(Input.GetKeyDown (KeyCode.LeftShift) && !isDash && canDash)
         {
             animator.SetBool("animDash", true);
             isDash = true;
             canDash = false;
+            // Set dash Animation to orientation of player
             FixedOrientation = CurrentOrientation;
+            if(isWallClimb)
+            {
+                FixedOrientation = -WallOrientation;
+                spriteRenderer.flipX = true;
+                if (FixedOrientation > 0)
+                {
+                    spriteRenderer.flipX = false;
+                }
+                isWallClimb = false;
+            }
+
             currentDashTime = 0;
         }
-
-
 
 
     }
@@ -153,11 +181,13 @@ public class PlayerMovement : MonoBehaviour
     // Physics and movement
     private void FixedUpdate()
     {
+
         // Update Jumping Speed (Y)
         PlayerMovementValues.SpeedY  += GravityValue * Time.deltaTime; // Because time squared
-
+        // Get new YPosition
         float newFrameYPosition = this.transform.position.y + PlayerMovementValues.SpeedY;
         float newFrameYFloorCheckCenterPosition = newFrameYPosition  - BoxYFloorPosition;
+        // We get the position of floor collision based on character size
 
         // Coyotte timer
         if(isCoyotte)
@@ -170,17 +200,19 @@ public class PlayerMovement : MonoBehaviour
                     curCoyotteTime = 0;
                 }
             }
-
+        // Change wall climb animation
         if(!isWallClimb)
         {
             animator.SetBool("animWallWait", false);
         }
 
         // Jumping on to the platforms
-        if(PlayerMovementValues.SpeedY <=0)
+        // When player falls or stays at same height, we make them collide with platforms
+        if(PlayerMovementValues.SpeedY <= 0)
         {
             LayerToIgnoreFloorCollision = -1;
         }
+        // When player jumps up, we ignore platform collision
         else
         {
             LayerToIgnoreFloorCollision = 6;
@@ -189,19 +221,24 @@ public class PlayerMovement : MonoBehaviour
         // Falling through platforms
         if(fallThrough)
         {
+            // Simple timer to give player time to fall through the platform
             fallThroughCurTime++;
             if(fallThroughCurTime >= FallThroughTime) {
                 fallThroughCurTime = 0;
                 fallThrough = false;
             }
         }
-            //Check if new position overlaps (Y) Floor
-            Collider2D floorCollision = Physics2D.OverlapBox(new Vector2(transform.position.x, newFrameYFloorCheckCenterPosition), new Vector2(BoxXCollisionSize, BoxYFloorCollisionCheck), 0f, LayerToIgnoreFloorCollision);
 
+        //Check if new position overlaps (Y) Floor
+        // Same x position, but new Y position
+        // When falling or dashing, we ignore platforms
+        Collider2D floorCollision = Physics2D.OverlapBox(new Vector2(transform.position.x, newFrameYFloorCheckCenterPosition), new Vector2(BoxXCollisionSize, BoxYFloorCollisionCheck), 0f, LayerToIgnoreFloorCollision);
+
+        // If player is not grounded and falling , we additionally check for floors player could go through on the high speed
         if (!isGrounded && PlayerMovementValues.SpeedY < -0.1f)
         {
             Vector2 newPos = new Vector2(transform.position.x, newFrameYFloorCheckCenterPosition);
-            Vector2 oldPos = new Vector2(lastFrameXPosition, lastFrameYPosition - BoxYFloorPosition) ;
+            Vector2 oldPos = new Vector2(lastFrameXPosition, lastFrameYPosition - BoxYFloorPosition);
 
             RaycastHit2D rayBox = Physics2D.BoxCast(newPos, new Vector2(BoxXCollisionSize, BoxYFloorCollisionCheck), 0, newPos - oldPos, Vector2.Distance(newPos, oldPos));
             if(rayBox.collider != null)
@@ -210,27 +247,37 @@ public class PlayerMovement : MonoBehaviour
             }
         }
 
-        // If we there is floor collision and we are in the air (Usually landing after we jumped) Land
+        // If there is no ground or floor object is platform, throu which we are falling through
         if (floorCollision == null || (floorCollision.gameObject.layer == 6 && fallThrough))
         {
+            // Update animation
             animator.SetBool("isLanded", false);
+            // Update airborne status
             isGrounded = false;
+            // If not in the jump, start coyotte timer
             if (!hasJumped && !isCoyotteEnded)
             {
                 isCoyotte = true;
             }
         }
+        // if there is solid ground, set player as landed
         else
         {
+            // Reset fall through
             fallThrough = false;
+            // Set player to be just above the ground
             newFrameYPosition = floorCollision.bounds.max.y + BoxYCollisionSize * 0.5f;
+            // Set animation as landed
             animator.SetBool("isLanded", true);
-            isGrounded = true;
-            isCoyotteEnded = false;
-            hasJumped = false;
-            canDash = true;
-
             animator.SetBool("animIsJumping", false);
+            // Is grounded
+            isGrounded = true;
+            // Reset coyotte 
+            isCoyotteEnded = false;
+            // Reset jump
+            hasJumped = false;
+            // Reset dash
+            canDash = true;
         }
 
         //Update position for this frame (X)
@@ -265,7 +312,18 @@ public class PlayerMovement : MonoBehaviour
         }
 
         //Check if new position overlaps (X)
-        Collider2D xCollision = Physics2D.OverlapBox(new Vector2(newFrameXPosition, newFrameYPosition), new Vector2(BoxXCollisionSize, BoxYCollisionSize * 0.9f), 0f);
+        Collider2D[] xCollision = Physics2D.OverlapBoxAll(new Vector2(newFrameXPosition, newFrameYPosition), new Vector2(BoxXCollisionSize, BoxYCollisionSize * 0.9f), 0f);
+        Collider2D xWallCollision = null;
+
+                for (int i = 0; i < xCollision.Length; i++)
+                {
+                    if (xCollision[i].gameObject.layer != 6)
+                    {
+                        xWallCollision = xCollision[i];
+                        break;
+                    }
+                }
+        
 
         if (CurrentOrientation == -WallOrientation&& isWallClimb)
         {
@@ -276,7 +334,7 @@ public class PlayerMovement : MonoBehaviour
             animator.SetBool("animWallWait", false);
         }
 
-        if (xCollision != null && xCollision.gameObject.layer != LayerToIgnoreXCollision)
+        if (xWallCollision != null)
         {
            // newFrameXPosition = lastFrameXPosition;
             // Instead of puting player to the previous frame, will put him just before the wall
@@ -285,16 +343,16 @@ public class PlayerMovement : MonoBehaviour
 
             // IMPORTANT:: Because of this, player WILL be closer to wall and floor check will fire and will put player to the top.
             // To fix this made X collision a little bigger
-            if (transform.position.x < xCollision.transform.position.x)
+            if (transform.position.x < xWallCollision.transform.position.x)
             {
-                newFrameXPosition = xCollision.bounds.min.x - BoxXCollisionSize * 0.55f;
+                newFrameXPosition = xWallCollision.bounds.min.x - BoxXCollisionSize * 0.55f;
             }
             else
             {
-                newFrameXPosition = xCollision.bounds.max.x + BoxXCollisionSize * 0.55f;
+                newFrameXPosition = xWallCollision.bounds.max.x + BoxXCollisionSize * 0.55f;
             }
 
-            if (!isGrounded && PlayerMovementValues.SpeedY <= 0 && !isWallClimb && this.transform.position.y + HandReachYHeight <= xCollision.bounds.max.y)
+            if (!isGrounded && PlayerMovementValues.SpeedY <= 0 && !isWallClimb && this.transform.position.y + HandReachYHeight <= xWallCollision.bounds.max.y)
             {
                 isWallClimb = true;
                 WallOrientation = CurrentOrientation;
