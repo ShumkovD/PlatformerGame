@@ -4141,7 +4141,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 930549880}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f8cee10c37af6c64b841f2c413b0f868, type: 3}
+  m_Script: {fileID: 11500000, guid: 7cc30787eb4261d4685c227f45981bf8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   DistanceToHook: 6
@@ -4884,6 +4884,7 @@ MonoBehaviour:
   JumpingImpulse: 0.35
   GravityValue: -1
   CoyotteTime: 5
+  curCoyotteTime: 0
   CurrentOrientation: 1
   DashTime: 0.2
   FixedOrientation: -1
@@ -5482,7 +5483,7 @@ Transform:
   m_GameObject: {fileID: 1348985269}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.728, y: -0.814, z: -0.039658997}
+  m_LocalPosition: {x: 4.63, y: 2.06, z: -0.039658997}
   m_LocalScale: {x: 1.5757502, y: 0.1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
