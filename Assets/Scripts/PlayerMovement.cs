@@ -272,6 +272,8 @@ public class PlayerMovement : MonoBehaviour
             animator.SetBool("animIsJumping", false);
             // Is grounded
             isGrounded = true;
+            //Set speed to 0
+            PlayerMovementValues.SpeedY = 0;
             // Reset coyotte 
             isCoyotteEnded = false;
             // Reset jump
@@ -312,11 +314,13 @@ public class PlayerMovement : MonoBehaviour
         }
 
         //Check if new position overlaps (X)
+        // Where might be times, when player collides with 2 or more x walls simultaniously. Usually while half inside of the platform
+        // LayerMask gives strange bug, so fix it by storing all colliders
         Collider2D[] xCollision = Physics2D.OverlapBoxAll(new Vector2(newFrameXPosition, newFrameYPosition), new Vector2(BoxXCollisionSize, BoxYCollisionSize * 0.9f), 0f);
         Collider2D xWallCollision = null;
-
-                for (int i = 0; i < xCollision.Length; i++)
-                {
+        // And getting only the wall collider from them
+       for (int i = 0; i < xCollision.Length; i++)
+       {
                     if (xCollision[i].gameObject.layer != 6)
                     {
                         xWallCollision = xCollision[i];
@@ -324,16 +328,19 @@ public class PlayerMovement : MonoBehaviour
                     }
                 }
         
-
+       // Check the Orientation and if while grabbing a wall, player moves from the wall, stom wall grab
         if (CurrentOrientation == -WallOrientation&& isWallClimb)
         {
+            //In that case no more wall climb
             isWallClimb = false;
+            // Cannot jump from the wall
             canWallJump = false;
+            // But have some grace coyotte time for jumping (cur 5 frames)
             isCoyotte = true;
-
+    
             animator.SetBool("animWallWait", false);
         }
-
+        // As walls are strictrly perbendicular to the ground, if there is a wall
         if (xWallCollision != null)
         {
            // newFrameXPosition = lastFrameXPosition;
@@ -343,6 +350,8 @@ public class PlayerMovement : MonoBehaviour
 
             // IMPORTANT:: Because of this, player WILL be closer to wall and floor check will fire and will put player to the top.
             // To fix this made X collision a little bigger
+
+            // Put the player maximally close to the wall
             if (transform.position.x < xWallCollision.transform.position.x)
             {
                 newFrameXPosition = xWallCollision.bounds.min.x - BoxXCollisionSize * 0.55f;
@@ -352,28 +361,35 @@ public class PlayerMovement : MonoBehaviour
                 newFrameXPosition = xWallCollision.bounds.max.x + BoxXCollisionSize * 0.55f;
             }
 
+            // If falling in the air and not climbing the wall and player position is under the ledge of the wall
             if (!isGrounded && PlayerMovementValues.SpeedY <= 0 && !isWallClimb && this.transform.position.y + HandReachYHeight <= xWallCollision.bounds.max.y)
             {
+                // Start wall climbing
                 isWallClimb = true;
+                // Set wall Orientation
                 WallOrientation = CurrentOrientation;
+                // Add ability to jump from the wall
                 canWallJump = true;
             }
         }
 
+        // If wall climb
         if(isWallClimb)
         {
-            animator.SetBool("animWallWait", true);
+            // Fix y speed
             PlayerMovementValues.SpeedY = 0;
             // Setting y position as constant to stop character falling while on thew wall
             newFrameYPosition = transform.position.y;
+            animator.SetBool("animWallWait", true);
         }
 
         // While we are landed we are not falling and not in the air
-        if (isGrounded)
-        {
-            PlayerMovementValues.SpeedY = 0;
-            isCoyotte = false;
-        }
+        //if (isGrounded)
+        //{
+        //    //If on the ground fix speedY to 0
+        //    PlayerMovementValues.SpeedY = 0;
+        //    isCoyotte = false;
+        //}
         animator.SetFloat("JumpingYSpeed", PlayerMovementValues.SpeedY);
             // Update real position
          this.transform.position = new Vector3(newFrameXPosition, newFrameYPosition);
