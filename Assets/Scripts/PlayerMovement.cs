@@ -40,6 +40,10 @@ public class PlayerMovement : MonoBehaviour
     float HandReachYHeight = 1.2f;
     private int WallOrientation = 0;
 
+    [SerializeField, Header("Attacking")]
+    float comboTime = 0.5f;
+    private float comboTimer = 0;
+    private int currentAttackNum = 0;
 
     private int AttackOrientation = 0;
     #endregion
@@ -58,17 +62,24 @@ public class PlayerMovement : MonoBehaviour
     private float lastFrameYPosition;
 
     private bool isGrounded = true;
+    //Coyotte
     private bool isCoyotte = false;
     private bool isCoyotteEnded = false;
+    //Dashing
     private bool isDash = false;
     private bool canDash = false;
+    //Jumping
     private bool hasJumped = false;
+    private bool jumpEndEarly = false;
     private bool fallThrough = false;
+    //WallClimb
     private bool isWallClimb = false;
     private bool canWallJump = false;
-    private bool jumpEndEarly = false;
+    //Attacks
     private bool isAtacking = false;
-    private bool hasAtackingEnded = false;
+    bool canStartCombo = false;
+    bool hasNextAttackInitiated = false;
+    bool canGetAttackInput = false;
     /// <summary>
     /// Used to communicate between Update and Fixed Update functions
     /// </summary>
@@ -79,7 +90,18 @@ public class PlayerMovement : MonoBehaviour
     }
     MovementValues PlayerMovementValues;
 
-    
+
+    enum PlayerState
+    {
+        None,
+        //Attack state
+        AttackStarted,
+        AttackProgress,
+        AttackTransition,
+        AttackDowntime,
+    }
+    PlayerState PlayerCurrentState = PlayerState.None;
+
 
     private void Start()
     {
@@ -203,17 +225,68 @@ public class PlayerMovement : MonoBehaviour
         }
 
 
-        if(Input.GetMouseButtonDown(0)&& isGrounded && !isDash)
+        switch (PlayerCurrentState)
         {
-            animator.SetTrigger("isAttack");
-            animator.SetBool("hasAttackEnded", false);
-            isAtacking = true;
-            // Set attack Orientation to be the same with the looking position
-            AttackOrientation = CurrentOrientation;
+            case PlayerState.None:
+                {
+                    if (Input.GetMouseButtonDown(0) && isGrounded && !isDash)
+                    {
+                        currentAttackNum = 0;
+                        AttackOrientation = CurrentOrientation;
+                        //
+                        PlayerCurrentState = PlayerState.AttackStarted;
+                    }
+                    break;
+                }
+            case PlayerState.AttackStarted:
+                {
+                    currentAttackNum++;
+                    animator.SetTrigger("isAttack");
+                    animator.SetBool("hasAttackEnded", false);
+                    PlayerCurrentState = PlayerState.AttackProgress;
+                }
+                break;
+            case PlayerState.AttackProgress:
+                {
+                    if(animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.5f)
+                    {
+                        PlayerCurrentState = PlayerState.AttackTransition;
+                    }
+                }
+                break;
+            case PlayerState.AttackTransition:
+                {
+                    if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 0.95f)
+                    {
+                        animator.SetBool("hasAttackEnded", true);
+                        PlayerCurrentState = PlayerState.None;
+                    }
+                 
+                    if (Input.GetMouseButtonDown(0) && currentAttackNum < 3)
+                    {
+                        PlayerCurrentState = PlayerState.AttackDowntime;
+                    }
+                }
+                break;
+            case PlayerState.AttackDowntime:
+                {
+                    if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 0.95f)
+                    {
+                        PlayerCurrentState = PlayerState.AttackStarted;
+                    }
+
+                    if(!animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()))
+                    {
+                        PlayerCurrentState = PlayerState.None;
+                    }
+                    break;
+                }
         }
 
+
+
         // If atacking lock the orientation until end
-        if(isAtacking)
+        if (isAtacking)
         {
             CurrentOrientation = AttackOrientation;
         }
@@ -234,13 +307,8 @@ public class PlayerMovement : MonoBehaviour
     private void FixedUpdate()
     {
 
-        if(isAtacking)
+        if(PlayerCurrentState !=  PlayerState.None)
         {
-            if(animator.GetCurrentAnimatorStateInfo(0).IsName("Attack 1") && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.95f)
-            {
-                animator.SetBool("hasAttackEnded", true);
-                isAtacking = false;
-            }
             return;
         }
 

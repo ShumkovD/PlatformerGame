@@ -4898,6 +4898,7 @@ MonoBehaviour:
   BoxYFloorPosition: 0.9
   FallThroughTime: 5
   HandReachYHeight: 1
+  comboTime: 0.25
   LayerToIgnoreHeadCollision: 6
   LayerToIgnoreFloorCollision: 6
   LayerToIgnoreXCollision: 6
