@@ -91,16 +91,22 @@ public class PlayerMovement : MonoBehaviour
     MovementValues PlayerMovementValues;
 
 
-    enum PlayerState
+    enum PlayerGlobalState
     {
-        None,
+
+    }
+
+  
+    enum PlayerAttackState
+    {
         //Attack state
+        None,
         AttackStarted,
         AttackProgress,
         AttackTransition,
         AttackDowntime,
     }
-    PlayerState PlayerCurrentState = PlayerState.None;
+    PlayerAttackState PlayerCurrentState = PlayerAttackState.None;
 
 
     private void Start()
@@ -227,58 +233,57 @@ public class PlayerMovement : MonoBehaviour
 
         switch (PlayerCurrentState)
         {
-            case PlayerState.None:
+
+            //PlayerAttackState
+            case PlayerAttackState.None:
                 {
                     if (Input.GetMouseButtonDown(0) && isGrounded && !isDash)
                     {
                         currentAttackNum = 0;
                         AttackOrientation = CurrentOrientation;
                         //
-                        PlayerCurrentState = PlayerState.AttackStarted;
+                        PlayerCurrentState = PlayerAttackState.AttackStarted;
                     }
                     break;
                 }
-            case PlayerState.AttackStarted:
+            case PlayerAttackState.AttackStarted:
                 {
                     currentAttackNum++;
                     animator.SetTrigger("isAttack");
                     animator.SetBool("hasAttackEnded", false);
-                    PlayerCurrentState = PlayerState.AttackProgress;
+                    PlayerCurrentState = PlayerAttackState.AttackProgress;
                 }
                 break;
-            case PlayerState.AttackProgress:
+            case PlayerAttackState.AttackProgress:
                 {
                     if(animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.5f)
                     {
-                        PlayerCurrentState = PlayerState.AttackTransition;
+                        PlayerCurrentState = PlayerAttackState.AttackTransition;
                     }
                 }
                 break;
-            case PlayerState.AttackTransition:
+            case PlayerAttackState.AttackTransition:
                 {
-                    if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 0.95f)
+                    if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
                     {
                         animator.SetBool("hasAttackEnded", true);
-                        PlayerCurrentState = PlayerState.None;
+                        PlayerCurrentState = PlayerAttackState.None;
+                        break;
                     }
                  
                     if (Input.GetMouseButtonDown(0) && currentAttackNum < 3)
                     {
-                        PlayerCurrentState = PlayerState.AttackDowntime;
+                        PlayerCurrentState = PlayerAttackState.AttackDowntime;
                     }
                 }
                 break;
-            case PlayerState.AttackDowntime:
+            case PlayerAttackState.AttackDowntime:
                 {
-                    if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 0.95f)
+                    if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >=1.0f && !animator.IsInTransition(0))
                     {
-                        PlayerCurrentState = PlayerState.AttackStarted;
+                        PlayerCurrentState = PlayerAttackState.AttackStarted;
                     }
 
-                    if(!animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()))
-                    {
-                        PlayerCurrentState = PlayerState.None;
-                    }
                     break;
                 }
         }
@@ -307,7 +312,7 @@ public class PlayerMovement : MonoBehaviour
     private void FixedUpdate()
     {
 
-        if(PlayerCurrentState !=  PlayerState.None)
+        if(PlayerCurrentState != PlayerAttackState.None)
         {
             return;
         }
