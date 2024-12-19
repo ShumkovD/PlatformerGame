@@ -55,6 +55,12 @@ public class PlayerMovement : MonoBehaviour
     Animator animator;
     SpriteRenderer spriteRenderer;
 
+    // Wall Data For Grabbing
+    float MaxYPosOfAWall = 0;
+
+    private int CurrentInput = 0;
+    private int CurrentWallPosition = 0; //1 is right, -1 is left to the player
+
     /// <summary>
     /// Used for collision checks and smooth gameplay
     /// </summary>
@@ -75,11 +81,7 @@ public class PlayerMovement : MonoBehaviour
     //WallClimb
     private bool isWallClimb = false;
     private bool canWallJump = false;
-    //Attacks
-    private bool isAtacking = false;
-    bool canStartCombo = false;
-    bool hasNextAttackInitiated = false;
-    bool canGetAttackInput = false;
+
     /// <summary>
     /// Used to communicate between Update and Fixed Update functions
     /// </summary>
@@ -91,13 +93,34 @@ public class PlayerMovement : MonoBehaviour
     MovementValues PlayerMovementValues;
 
 
-    enum PlayerGlobalState
+
+    public enum PlayerWallGrab
     {
-
+        None,
+        StartGrab,
+        Grabbed,
+        EndGrabToJump,
+        EndGrabToCoyotte
     }
+    PlayerWallGrab PlayerCurrentWallGrab = PlayerWallGrab.None;
 
-  
-    enum PlayerAttackState
+    public enum PlayerDashState
+    {
+        None,
+        StartDash,
+        Dash,
+        EndDash
+    }
+    public PlayerDashState PlayerCurrentDashState = PlayerDashState.None;
+
+    public enum PlayerAirState
+    {
+        Grounded,
+        Air
+    }
+    public PlayerAirState PlayerCurrentAirState = PlayerAirState.Grounded;
+
+    public enum PlayerAttackState
     {
         //Attack state
         None,
@@ -106,7 +129,7 @@ public class PlayerMovement : MonoBehaviour
         AttackTransition,
         AttackDowntime,
     }
-    PlayerAttackState PlayerCurrentState = PlayerAttackState.None;
+    public PlayerAttackState PlayerCurrentAttackState = PlayerAttackState.None;
 
 
     private void Start()
@@ -120,10 +143,11 @@ public class PlayerMovement : MonoBehaviour
     // Inputs
     private void Update()
     {
+        CurrentInput = (int)Input.GetAxisRaw("Horizontal");
         // Player Speed Inputs
-        PlayerMovementValues.SpeedX = Input.GetAxisRaw("Horizontal") * HorizontalMovementSpeedMultiplier;
+        PlayerMovementValues.SpeedX = CurrentInput * HorizontalMovementSpeedMultiplier;
 
-        // Player Dash Speed modulation (When dashing, inputs are off)
+        // Player Dash Speed modulation (When dashing Speed change is off)
         if(isDash)
         {
             PlayerMovementValues.SpeedX = 0;
@@ -208,93 +232,177 @@ public class PlayerMovement : MonoBehaviour
             }
         }
 
-        // If left shift is pressed and can dash, dash!
-        if(Input.GetKeyDown (KeyCode.LeftShift) && !isDash && canDash)
+        // Player Air
+        switch (PlayerCurrentAirState)
         {
-            animator.SetBool("animDash", true);
-            isDash = true;
-            canDash = false;
-            // Set dash Animation to orientation of player
-            FixedOrientation = CurrentOrientation;
-            if(isWallClimb)
-            {
-                FixedOrientation = -WallOrientation;
-                spriteRenderer.flipX = true;
-                if (FixedOrientation > 0)
+            case PlayerAirState.Grounded:
                 {
-                    spriteRenderer.flipX = false;
-                }
-                isWallClimb = false;
-            }
-
-            currentDashTime = 0;
-        }
-
-
-        switch (PlayerCurrentState)
-        {
-
-            //PlayerAttackState
-            case PlayerAttackState.None:
-                {
-                    if (Input.GetMouseButtonDown(0) && isGrounded && !isDash)
+                    // Player Grounded Attack Code
+                    switch (PlayerCurrentAttackState)
                     {
-                        currentAttackNum = 0;
-                        AttackOrientation = CurrentOrientation;
-                        //
-                        PlayerCurrentState = PlayerAttackState.AttackStarted;
+                        //PlayerAttackState
+                        case PlayerAttackState.None:
+                            {
+                                if (Input.GetMouseButtonDown(0) && !isDash)
+                                {
+                                    currentAttackNum = 0;
+                                    AttackOrientation = CurrentOrientation;
+                                    //
+                                    PlayerCurrentAttackState = PlayerAttackState.AttackStarted;
+                                }
+                                break;
+                            }
+                        case PlayerAttackState.AttackStarted:
+                            {
+                                currentAttackNum++;
+                                animator.SetTrigger("isAttack");
+                                animator.SetBool("hasAttackEnded", false);
+                                PlayerCurrentAttackState = PlayerAttackState.AttackProgress;
+                            }
+                            break;
+                        case PlayerAttackState.AttackProgress:
+                            {
+                                if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.5f)
+                                {
+                                    PlayerCurrentAttackState = PlayerAttackState.AttackTransition;
+                                }
+                            }
+                            break;
+                        case PlayerAttackState.AttackTransition:
+                            {
+                                if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
+                                {
+                                    animator.SetBool("hasAttackEnded", true);
+                                    PlayerCurrentAttackState = PlayerAttackState.None;
+                                    break;
+                                }
+
+                                if (Input.GetMouseButtonDown(0) && currentAttackNum < 3)
+                                {
+                                    PlayerCurrentAttackState = PlayerAttackState.AttackDowntime;
+                                }
+                            }
+                            break;
+                        case PlayerAttackState.AttackDowntime:
+                            {
+                                if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
+                                {
+                                    PlayerCurrentAttackState = PlayerAttackState.AttackStarted;
+                                }
+
+                                break;
+                            }
                     }
-                    break;
-                }
-            case PlayerAttackState.AttackStarted:
-                {
-                    currentAttackNum++;
-                    animator.SetTrigger("isAttack");
-                    animator.SetBool("hasAttackEnded", false);
-                    PlayerCurrentState = PlayerAttackState.AttackProgress;
+
+                    // Player Grounded 
                 }
                 break;
-            case PlayerAttackState.AttackProgress:
+            case PlayerAirState.Air:
                 {
-                    if(animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.5f)
+                    // Player Wall Grabbing
+                    switch (PlayerCurrentWallGrab)
                     {
-                        PlayerCurrentState = PlayerAttackState.AttackTransition;
+                        case PlayerWallGrab.None:
+                            {
+                                // If input is in the direction of the wall
+                                if (CurrentInput            == CurrentWallPosition && 
+                                    // Where is a wall collision
+                                    CurrentWallPosition != 0                                &&
+                                    // And character is in the position to logically grab the ledge / wall
+                                    MaxYPosOfAWall      >= this.transform.position.y + HandReachYHeight &&
+                                    //And at last player is falling
+                                     PlayerMovementValues.SpeedY <= 0
+                                    )
+                                {
+                                    // Start Grabbing the ledge
+                                    PlayerCurrentWallGrab = PlayerWallGrab.StartGrab;
+                                }
+                            }
+                            break;
+                        case PlayerWallGrab.StartGrab:
+                            {
+                                animator.SetBool("animWallWait", true);
+                                PlayerCurrentWallGrab = PlayerWallGrab.Grabbed;
+                                WallOrientation = CurrentWallPosition;
+                            }
+                            break;
+                        case PlayerWallGrab.Grabbed:
+                            {
+                                if (CurrentInput == -WallOrientation)
+                                {
+                                    PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToCoyotte;
+                                }
+                                if (Input.GetKeyDown(KeyCode.Space))
+                                {
+                                    PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToJump;
+                                }
+                            }
+                            break;
+                        case PlayerWallGrab.EndGrabToJump:
+                            {
+                                animator.SetBool("animWallWait", false);
+                                PlayerCurrentWallGrab = PlayerWallGrab.None;
+                            }
+                            break;
+                        case PlayerWallGrab.EndGrabToCoyotte:
+                            {
+                                animator.SetBool("animWallWait", false);
+                                PlayerCurrentWallGrab = PlayerWallGrab.None;
+                            }
+                            break;
                     }
                 }
                 break;
-            case PlayerAttackState.AttackTransition:
-                {
-                    if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
-                    {
-                        animator.SetBool("hasAttackEnded", true);
-                        PlayerCurrentState = PlayerAttackState.None;
-                        break;
-                    }
-                 
-                    if (Input.GetMouseButtonDown(0) && currentAttackNum < 3)
-                    {
-                        PlayerCurrentState = PlayerAttackState.AttackDowntime;
-                    }
-                }
-                break;
-            case PlayerAttackState.AttackDowntime:
-                {
-                    if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >=1.0f && !animator.IsInTransition(0))
-                    {
-                        PlayerCurrentState = PlayerAttackState.AttackStarted;
-                    }
-
-                    break;
-                }
         }
-
-
-
-        // If atacking lock the orientation until end
-        if (isAtacking)
+        // Player Dashing
+        switch (PlayerCurrentDashState)
         {
-            CurrentOrientation = AttackOrientation;
+            case PlayerDashState.None:
+                {
+                    if (Input.GetKeyDown(KeyCode.LeftShift))
+                    {
+                        //if (isWallClimb)
+                        //{
+                        //    FixedOrientation = -WallOrientation;
+                        //    spriteRenderer.flipX = true;
+                        //    if (FixedOrientation > 0)
+                        //    {
+                        //        spriteRenderer.flipX = false;
+                        //    }
+                        //    isWallClimb = false;
+                        //}
+
+                        PlayerCurrentDashState = PlayerDashState.StartDash;
+                    }
+                }
+                break;
+            case PlayerDashState.StartDash:
+                {
+                    currentDashTime = 0;
+                    animator.SetBool("animDash", true);
+                    FixedOrientation = CurrentOrientation;
+                    PlayerCurrentDashState = PlayerDashState.Dash;
+                }
+                break;
+            case PlayerDashState.Dash:
+                {
+                    currentDashTime += Time.deltaTime;
+                    CurrentOrientation = FixedOrientation;
+                    if (currentDashTime >= DashTime)
+                    {
+                        PlayerCurrentDashState = PlayerDashState.EndDash;
+                    }
+                }
+                break;
+            case PlayerDashState.EndDash:
+                {
+                    animator.SetBool("animDash", false);
+                    currentDashTime = 0;
+                    PlayerCurrentDashState = PlayerDashState.None;
+                }
+                break;
         }
+
 
         // Here we change the sprite orientation
         if (CurrentOrientation > 0)
@@ -312,7 +420,7 @@ public class PlayerMovement : MonoBehaviour
     private void FixedUpdate()
     {
 
-        if(PlayerCurrentState != PlayerAttackState.None)
+        if(PlayerCurrentAttackState != PlayerAttackState.None)
         {
             return;
         }
@@ -335,12 +443,7 @@ public class PlayerMovement : MonoBehaviour
                     curCoyotteTime = 0;
                 }
             }
-        // Change wall climb animation
-        if(!isWallClimb)
-        {
-            animator.SetBool("animWallWait", false);
-        }
-
+        
         // Jumping on to the platforms
         // When player falls or stays at same height, we make them collide with platforms
         if(PlayerMovementValues.SpeedY <= 0)
@@ -385,6 +488,7 @@ public class PlayerMovement : MonoBehaviour
         // If there is no ground or floor object is platform, throu which we are falling through
         if (floorCollision == null || (floorCollision.gameObject.layer == 6 && fallThrough))
         {
+            PlayerCurrentAirState = PlayerAirState.Air;
             // Update animation
             animator.SetBool("isLanded", false);
             // Update airborne status
@@ -398,6 +502,7 @@ public class PlayerMovement : MonoBehaviour
         // if there is solid ground, set player as landed
         else
         {
+            PlayerCurrentAirState = PlayerAirState.Grounded;
             // Reset fall through
             fallThrough = false;
             // Set player to be just above the ground
@@ -420,25 +525,23 @@ public class PlayerMovement : MonoBehaviour
         //Update position for this frame (X)
         float newFrameXPosition = this.transform.position.x + PlayerMovementValues.SpeedX;
 
-        // Dash
-        if (isDash)
+
+        switch (PlayerCurrentDashState)
         {
-            // Setting y position as constant to stop character falling while dashing
-            newFrameYPosition = transform.position.y;
-
-            // Dash acceleration
-            newFrameXPosition = this.transform.position.x + HorizontalMovementSpeedMultiplier * DashSpeedMultiplier * FixedOrientation;
-
-            canWallJump = false;
-
-            currentDashTime += Time.deltaTime;
-            if (currentDashTime > DashTime)
-            {
-                animator.SetBool("animDash", false);
-                isDash = false;
-                PlayerMovementValues.SpeedY = 0;
-            }
+            case PlayerDashState.StartDash:
+            case PlayerDashState.Dash:
+                {
+                    newFrameYPosition = transform.position.y;
+                    newFrameXPosition = this.transform.position.x + HorizontalMovementSpeedMultiplier * DashSpeedMultiplier * FixedOrientation;
+                }
+                break;
+            case PlayerDashState.EndDash:
+                {
+                    PlayerMovementValues.SpeedY = 0;
+                }
+                break;
         }
+
 
         // Checking for the head collision
         float newFrameYHeadCheckCenterPosition = newFrameYPosition + BoxYHeadPosition;
@@ -480,7 +583,8 @@ public class PlayerMovement : MonoBehaviour
         // As walls are strictrly perbendicular to the ground, if there is a wall
         if (xWallCollision != null)
         {
-           // newFrameXPosition = lastFrameXPosition;
+            MaxYPosOfAWall = xWallCollision.bounds.max.y;
+            // newFrameXPosition = lastFrameXPosition;
             // Instead of puting player to the previous frame, will put him just before the wall
             // There should not be any situations where player will collide on X axis with 2 objects with different x bounds, so should work just fine
             // REASON: When trying to collide with wall because Unity not pixel perfect engine, sprite and player collision will always be different (espesially after dash)
@@ -492,32 +596,66 @@ public class PlayerMovement : MonoBehaviour
             if (transform.position.x < xWallCollision.transform.position.x)
             {
                 newFrameXPosition = xWallCollision.bounds.min.x - BoxXCollisionSize * 0.55f;
+                CurrentWallPosition = 1;
             }
             else
             {
                 newFrameXPosition = xWallCollision.bounds.max.x + BoxXCollisionSize * 0.55f;
+                CurrentWallPosition = -1;
             }
 
             // If falling in the air and not climbing the wall and player position is under the ledge of the wall
-            if (!isGrounded && PlayerMovementValues.SpeedY <= 0 && !isWallClimb && this.transform.position.y + HandReachYHeight <= xWallCollision.bounds.max.y)
-            {
-                // Start wall climbing
-                isWallClimb = true;
-                // Set wall Orientation
-                WallOrientation = CurrentOrientation;
-                // Add ability to jump from the wall
-                canWallJump = true;
-            }
+            //if (!isGrounded && PlayerMovementValues.SpeedY <= 0 && !isWallClimb && this.transform.position.y + HandReachYHeight <= xWallCollision.bounds.max.y)
+            //{
+            //    // Start wall climbing
+            //    isWallClimb = true;
+            //    // Set wall Orientation
+            //    WallOrientation = CurrentOrientation;
+            //    // Add ability to jump from the wall
+            //    canWallJump = true;
+            //}
+        }
+        else
+        {
+            CurrentWallPosition = 0;
         }
 
         // If wall climb
-        if(isWallClimb)
+        //if(isWallClimb)
+        //{
+        //    // Fix y speed
+        //    PlayerMovementValues.SpeedY = 0;
+        //    // Setting y position as constant to stop character falling while on thew wall
+        //    newFrameYPosition = transform.position.y;
+        //    animator.SetBool("animWallWait", true);
+        //}
+
+        switch (PlayerCurrentWallGrab)
         {
-            // Fix y speed
-            PlayerMovementValues.SpeedY = 0;
-            // Setting y position as constant to stop character falling while on thew wall
-            newFrameYPosition = transform.position.y;
-            animator.SetBool("animWallWait", true);
+            case PlayerWallGrab.Grabbed:
+                {
+                    PlayerMovementValues.SpeedY = 0;
+                    newFrameYPosition = transform.position.y;
+                    if (CurrentInput != CurrentWallPosition)
+                    {
+                        PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToCoyotte;
+                    }
+                    if (Input.GetKeyDown(KeyCode.Space))
+                    {
+                        PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToJump;
+                    }
+                }
+                break;
+            case PlayerWallGrab.EndGrabToJump:
+                {
+
+                }
+                break;
+            case PlayerWallGrab.EndGrabToCoyotte:
+                {
+
+                }
+                break;
         }
 
         // While we are landed we are not falling and not in the air
