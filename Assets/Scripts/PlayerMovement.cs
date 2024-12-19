@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
+using Unity.VisualScripting;
 using UnityEngine;
 using static UnityEditor.Experimental.GraphView.GraphView;
 
@@ -94,6 +95,17 @@ public class PlayerMovement : MonoBehaviour
 
 
 
+    public enum PlayerJumpState
+    {
+        //Attack state
+        None,
+        JumpStarted,
+        JumpProgress,
+        JumpInterrupted,
+        JumpEnded
+    }
+    public PlayerJumpState PlayerCurrentJumpState = PlayerJumpState.None;
+
     public enum PlayerWallGrab
     {
         None,
@@ -147,12 +159,6 @@ public class PlayerMovement : MonoBehaviour
         // Player Speed Inputs
         PlayerMovementValues.SpeedX = CurrentInput * HorizontalMovementSpeedMultiplier;
 
-        // Player Dash Speed modulation (When dashing Speed change is off)
-        if(isDash)
-        {
-            PlayerMovementValues.SpeedX = 0;
-        }
-
         // Set orientation of the player sprite and remember it
         if( PlayerMovementValues.SpeedX < 0)
         {
@@ -176,61 +182,60 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // If pressed S,
-        if (Input.GetKey(KeyCode.S))
-        {
-            //And space, while on the ground and not dashing, 
-            if (Input.GetKeyDown(KeyCode.Space) && isGrounded && !isDash)
-            {
-                // Fall through
-                fallThrough = true;
-            }
-        }
-        else
-        {
-            // If S is not pressed, when pressing space and in jumpable state
-            if (Input.GetKeyDown(KeyCode.Space) && (isGrounded || isCoyotte || canWallJump))
-            {
-                // Jump
-                PlayerMovementValues.SpeedY = JumpingImpulse;
-                animator.SetBool("animIsJumping", true);
-                // If jumping you are not on the ground
-                isGrounded = false;
-                // You have jumped
-                hasJumped = true;
-                // You are not on the wall anymore
-                isWallClimb = false;
-                // You cannot jump from the said wall
-                canWallJump = false;
-                // Coyotte time is not applicabel as well
-                isCoyotte = false;
-            }
+        //if (Input.GetKey(KeyCode.S))
+        //{
+        //    //And space, while on the ground and not dashing, 
+        //    if (Input.GetKeyDown(KeyCode.Space) && isGrounded && !isDash)
+        //    {
+        //        // Fall through
+        //        fallThrough = true;
+        //    }
+        //}
+        //else
+        //{
+        //    // If S is not pressed, when pressing space and in jumpable state
+        //    //if (Input.GetKeyDown(KeyCode.Space) && (isGrounded || isCoyotte || canWallJump))
+        //    //{
+        //    //    // Jump
 
-            // If Space key is up and player movement speed is more than minimal jump speed, then stop getting velocity
-            if (Input.GetKeyUp(KeyCode.Space) && hasJumped)
-            {
-                if (PlayerMovementValues.SpeedY > minJumpingPower)
-                {
-                    jumpEndEarly = true;
-                }
-                else
-                {
-                    if (PlayerMovementValues.SpeedY > 0)
-                    {
-                        PlayerMovementValues.SpeedY = 0;
-                    }
-                }
-            }
+        //    //    // If jumping you are not on the ground
+        //    //    isGrounded = false;
+        //    //    // You have jumped
+        //    //    hasJumped = true;
+        //    //    // You are not on the wall anymore
+        //    //    isWallClimb = false;
+        //    //    // You cannot jump from the said wall
+        //    //    canWallJump = false;
+        //    //    // Coyotte time is not applicabel as well
+        //    //    isCoyotte = false;
+        //    //}
 
-        }
+        //    // If Space key is up and player movement speed is more than minimal jump speed, then stop getting velocity
+        //    if (Input.GetKeyUp(KeyCode.Space) && hasJumped)
+        //    {
+        //        if (PlayerMovementValues.SpeedY > minJumpingPower)
+        //        {
+        //            jumpEndEarly = true;
+        //        }
+        //        else
+        //        {
+        //            if (PlayerMovementValues.SpeedY > 0)
+        //            {
+        //                PlayerMovementValues.SpeedY = 0;
+        //            }
+        //        }
+        //    }
 
-        if(jumpEndEarly)
-        {
-            if(PlayerMovementValues.SpeedY <= minJumpingPower)
-            {
-                PlayerMovementValues.SpeedY = 0;
-                jumpEndEarly = false;
-            }
-        }
+        //}
+
+        //if(jumpEndEarly)
+        //{
+        //    if(PlayerMovementValues.SpeedY <= minJumpingPower)
+        //    {
+        //        PlayerMovementValues.SpeedY = 0;
+        //        jumpEndEarly = false;
+        //    }
+        //}
 
         // Player Air
         switch (PlayerCurrentAirState)
@@ -293,8 +298,6 @@ public class PlayerMovement : MonoBehaviour
                                 break;
                             }
                     }
-
-                    // Player Grounded 
                 }
                 break;
             case PlayerAirState.Air:
@@ -403,6 +406,44 @@ public class PlayerMovement : MonoBehaviour
                 break;
         }
 
+        // Player Grounded 
+        switch (PlayerCurrentJumpState)
+        {
+            case PlayerJumpState.None:
+                {
+                    if (Input.GetKeyDown(KeyCode.Space))
+                    {
+                        Debug.Log("Currently pressed Space");
+                        PlayerCurrentJumpState = PlayerJumpState.JumpStarted;
+                    }
+                }
+                break;
+            case PlayerJumpState.JumpStarted:
+                {
+                    animator.SetBool("animIsJumping", true);
+                }
+                break;
+            case PlayerJumpState.JumpProgress:
+                {
+                    if (!Input.GetKeyUp(KeyCode.Space))
+                    {
+                        return;
+                    }
+
+                    if (PlayerMovementValues.SpeedY > minJumpingPower)
+                    {
+                        PlayerCurrentJumpState = PlayerJumpState.JumpInterrupted;
+                    }
+                }
+                break;
+            case PlayerJumpState.JumpEnded:
+                {
+                    PlayerMovementValues.SpeedY = 0;
+                    PlayerCurrentJumpState = PlayerJumpState.None;
+                }
+                break;
+        }
+
 
         // Here we change the sprite orientation
         if (CurrentOrientation > 0)
@@ -423,6 +464,30 @@ public class PlayerMovement : MonoBehaviour
         if(PlayerCurrentAttackState != PlayerAttackState.None)
         {
             return;
+        }
+
+        switch (PlayerCurrentJumpState)
+        {
+            case PlayerJumpState.JumpStarted:
+                {
+                    PlayerMovementValues.SpeedY = JumpingImpulse;
+                    PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
+                }
+                break;
+            case PlayerJumpState.JumpInterrupted:
+                {
+                    PlayerMovementValues.SpeedY = 0;
+                    PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
+                }
+                break;
+            case PlayerJumpState.JumpProgress:
+                {
+                    if (PlayerCurrentAirState == PlayerAirState.Grounded)
+                    {
+                        PlayerCurrentJumpState = PlayerJumpState.JumpEnded;
+                    }
+                }
+                break;
         }
 
         // Update Jumping Speed (Y)
@@ -492,34 +557,35 @@ public class PlayerMovement : MonoBehaviour
             // Update animation
             animator.SetBool("isLanded", false);
             // Update airborne status
-            isGrounded = false;
+            //isGrounded = false;
             // If not in the jump, start coyotte timer
-            if (!hasJumped && !isCoyotteEnded)
-            {
-                isCoyotte = true;
-            }
+            //if (!hasJumped && !isCoyotteEnded)
+            //{
+            //    isCoyotte = true;
+            //}
         }
         // if there is solid ground, set player as landed
         else
         {
+            //PlayerCurrentJumpState = PlayerJumpState.JumpStopped;
             PlayerCurrentAirState = PlayerAirState.Grounded;
             // Reset fall through
-            fallThrough = false;
+           // fallThrough = false;
             // Set player to be just above the ground
             newFrameYPosition = floorCollision.bounds.max.y + BoxYCollisionSize * 0.5f;
             // Set animation as landed
             animator.SetBool("isLanded", true);
             animator.SetBool("animIsJumping", false);
-            // Is grounded
-            isGrounded = true;
-            //Set speed to 0
+            //// Is grounded
+            //isGrounded = true;
+            ////Set speed to 0
             PlayerMovementValues.SpeedY = 0;
-            // Reset coyotte 
-            isCoyotteEnded = false;
-            // Reset jump
-            hasJumped = false;
-            // Reset dash
-            canDash = true;
+            //// Reset coyotte 
+            //isCoyotteEnded = false;
+            //// Reset jump
+            //hasJumped = false;
+            //// Reset dash
+            //canDash = true;
         }
 
         //Update position for this frame (X)
