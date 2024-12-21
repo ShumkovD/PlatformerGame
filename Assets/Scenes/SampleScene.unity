@@ -5017,7 +5017,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   HorizontalMovementSpeedMultiplier: 0.13
   JumpingImpulse: 0.35
-  minJumpingPower: 0.15
+  minJumpingPower: 0.23
   GravityValue: -1
   CoyotteTime: 5
   curCoyotteTime: 0
@@ -5037,6 +5037,7 @@ MonoBehaviour:
   LayerToIgnoreHeadCollision: 6
   LayerToIgnoreFloorCollision: 6
   LayerToIgnoreXCollision: 6
+  PlayerCurrentJumpState: 0
   PlayerCurrentDashState: 0
   PlayerCurrentAirState: 0
   PlayerCurrentAttackState: 0

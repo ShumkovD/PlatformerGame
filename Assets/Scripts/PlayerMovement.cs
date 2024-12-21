@@ -434,6 +434,12 @@ public class PlayerMovement : MonoBehaviour
                     {
                         PlayerCurrentJumpState = PlayerJumpState.JumpInterrupted;
                     }
+                    else
+                    {
+                        PlayerMovementValues.SpeedY = 0;
+                        PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
+                    }
+
                 }
                 break;
             case PlayerJumpState.JumpEnded:
@@ -476,8 +482,16 @@ public class PlayerMovement : MonoBehaviour
                 break;
             case PlayerJumpState.JumpInterrupted:
                 {
-                    PlayerMovementValues.SpeedY = 0;
-                    PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
+                    if(PlayerMovementValues.SpeedY < 0)
+                    {
+                        PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
+                    }
+
+                    if (PlayerMovementValues.SpeedY <= minJumpingPower)
+                    {
+                        PlayerMovementValues.SpeedY = 0;
+                        PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
+                    }
                 }
                 break;
             case PlayerJumpState.JumpProgress:
