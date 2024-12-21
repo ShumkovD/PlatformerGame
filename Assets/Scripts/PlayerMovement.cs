@@ -168,34 +168,16 @@ public class PlayerMovement : MonoBehaviour
 
 
 
-        // If pressed S,
-        //if (Input.GetKey(KeyCode.S))
-        //{
-        //    //And space, while on the ground and not dashing, 
-        //    if (Input.GetKeyDown(KeyCode.Space) && isGrounded && !isDash)
-        //    {
-        //        // Fall through
-        //        fallThrough = true;
-        //    }
-        //}
-        //else
-        //{
-        //    // If S is not pressed, when pressing space and in jumpable state
-        //    //if (Input.GetKeyDown(KeyCode.Space) && (isGrounded || isCoyotte || canWallJump))
-        //    //{
-        //    //    // Jump
-
-        //    //    // If jumping you are not on the ground
-        //    //    isGrounded = false;
-        //    //    // You have jumped
-        //    //    hasJumped = true;
-        //    //    // You are not on the wall anymore
-        //    //    isWallClimb = false;
-        //    //    // You cannot jump from the said wall
-        //    //    canWallJump = false;
-        //    //    // Coyotte time is not applicabel as well
-        //    //    isCoyotte = false;
-        //    //}
+       // If pressed S,
+        if (Input.GetKey(KeyCode.S))
+        {
+            //And space, while on the ground and not dashing, 
+            if (/*Input.GetKeyDown(KeyCode.Space) &&*/ PlayerCurrentAirState ==  PlayerAirState.Grounded)
+            {
+                // Fall through
+                fallThrough = true;
+            }
+        }
 
 
         // Player Air
