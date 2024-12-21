@@ -72,16 +72,8 @@ public class PlayerMovement : MonoBehaviour
     //Coyotte
     private bool isCoyotte = false;
     private bool isCoyotteEnded = false;
-    //Dashing
-    private bool isDash = false;
-    private bool canDash = false;
     //Jumping
-    private bool hasJumped = false;
-    private bool jumpEndEarly = false;
     private bool fallThrough = false;
-    //WallClimb
-    private bool isWallClimb = false;
-    private bool canWallJump = false;
 
     /// <summary>
     /// Used to communicate between Update and Fixed Update functions
@@ -248,7 +240,7 @@ public class PlayerMovement : MonoBehaviour
                         //PlayerAttackState
                         case PlayerAttackState.None:
                             {
-                                if (Input.GetMouseButtonDown(0) && !isDash)
+                                if (Input.GetMouseButtonDown(0))
                                 {
                                     currentAttackNum = 0;
                                     AttackOrientation = CurrentOrientation;
@@ -649,17 +641,17 @@ public class PlayerMovement : MonoBehaviour
                 }
         
        // Check the Orientation and if while grabbing a wall, player moves from the wall, stom wall grab
-        if (CurrentOrientation == -WallOrientation&& isWallClimb)
-        {
-            //In that case no more wall climb
-            isWallClimb = false;
-            // Cannot jump from the wall
-            canWallJump = false;
-            // But have some grace coyotte time for jumping (cur 5 frames)
-            isCoyotte = true;
+        //if (CurrentOrientation == -WallOrientation&& isWallClimb)
+        //{
+        //    //In that case no more wall climb
+        //    isWallClimb = false;
+        //    // Cannot jump from the wall
+        //    canWallJump = false;
+        //    // But have some grace coyotte time for jumping (cur 5 frames)
+        //    isCoyotte = true;
     
-            animator.SetBool("animWallWait", false);
-        }
+        //    animator.SetBool("animWallWait", false);
+        //}
         // As walls are strictrly perbendicular to the ground, if there is a wall
         if (xWallCollision != null)
         {
