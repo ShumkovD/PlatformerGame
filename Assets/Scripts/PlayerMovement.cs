@@ -15,8 +15,8 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] float JumpingImpulse = 5;
     [SerializeField] float minJumpingPower = 0.5f;
     [SerializeField] float GravityValue = -5;
-    [SerializeField] int CoyotteTime = 5;
-    [SerializeField] int curCoyotteTime = 0;
+    [SerializeField] float CoyotteTime = 0.08f;
+    private float curCoyotteTime = 0;
     [SerializeField] int CurrentOrientation = -1;
 
     [SerializeField, Header("Dash Movement Values")]
@@ -69,9 +69,6 @@ public class PlayerMovement : MonoBehaviour
     private float lastFrameYPosition;
 
     private bool isGrounded = true;
-    //Coyotte
-    private bool isCoyotte = false;
-    private bool isCoyotteEnded = false;
     //Jumping
     private bool fallThrough = false;
 
@@ -86,6 +83,13 @@ public class PlayerMovement : MonoBehaviour
     MovementValues PlayerMovementValues;
 
 
+    public enum PlayerCoyotteState
+    {
+        None,
+        Coyotte,
+        CoyotteEnd
+    }
+    public PlayerCoyotteState PlayerCurrentCoyotteState = PlayerCoyotteState.None;
 
     public enum PlayerJumpState
     {
@@ -152,7 +156,7 @@ public class PlayerMovement : MonoBehaviour
         PlayerMovementValues.SpeedX = CurrentInput * HorizontalMovementSpeedMultiplier;
 
         // Set orientation of the player sprite and remember it
-        if( PlayerMovementValues.SpeedX < 0)
+        if (PlayerMovementValues.SpeedX < 0)
         {
             CurrentOrientation = -1;
         }
@@ -161,17 +165,8 @@ public class PlayerMovement : MonoBehaviour
             CurrentOrientation = 1;
         }
 
-        // Change animation to run if Speed is not 0
-        if (PlayerMovementValues.SpeedX != 0)
-        {
-            animator.SetBool("animIsRunning", true);
-            animator.SetBool("animIsIdle", false);
-        }
-        else
-        {
-            animator.SetBool("animIsRunning", false);
-            animator.SetBool("animIsIdle", true);
-        }
+
+
 
         // If pressed S,
         //if (Input.GetKey(KeyCode.S))
@@ -202,32 +197,6 @@ public class PlayerMovement : MonoBehaviour
         //    //    isCoyotte = false;
         //    //}
 
-        //    // If Space key is up and player movement speed is more than minimal jump speed, then stop getting velocity
-        //    if (Input.GetKeyUp(KeyCode.Space) && hasJumped)
-        //    {
-        //        if (PlayerMovementValues.SpeedY > minJumpingPower)
-        //        {
-        //            jumpEndEarly = true;
-        //        }
-        //        else
-        //        {
-        //            if (PlayerMovementValues.SpeedY > 0)
-        //            {
-        //                PlayerMovementValues.SpeedY = 0;
-        //            }
-        //        }
-        //    }
-
-        //}
-
-        //if(jumpEndEarly)
-        //{
-        //    if(PlayerMovementValues.SpeedY <= minJumpingPower)
-        //    {
-        //        PlayerMovementValues.SpeedY = 0;
-        //        jumpEndEarly = false;
-        //    }
-        //}
 
         // Player Air
         switch (PlayerCurrentAirState)
@@ -290,6 +259,8 @@ public class PlayerMovement : MonoBehaviour
                                 break;
                             }
                     }
+                    // Player Jump State Code
+                    PlayerJumpUpdateStateCode(PlayerCurrentJumpState);
                 }
                 break;
             case PlayerAirState.Air:
@@ -300,12 +271,12 @@ public class PlayerMovement : MonoBehaviour
                         case PlayerWallGrab.None:
                             {
                                 // If input is in the direction of the wall
-                                if (CurrentInput            == CurrentWallPosition && 
+                                if (CurrentInput == CurrentWallPosition &&
                                     // Where is a wall collision
-                                    CurrentWallPosition != 0                                &&
+                                    CurrentWallPosition != 0 &&
                                     // And character is in the position to logically grab the ledge / wall
-                                    MaxYPosOfAWall      >= this.transform.position.y + HandReachYHeight &&
-                                    //And at last player is falling
+                                    MaxYPosOfAWall >= this.transform.position.y + HandReachYHeight &&
+                                     //And at last player is falling
                                      PlayerMovementValues.SpeedY <= 0
                                     )
                                 {
@@ -343,9 +314,46 @@ public class PlayerMovement : MonoBehaviour
                             {
                                 animator.SetBool("animWallWait", false);
                                 PlayerCurrentWallGrab = PlayerWallGrab.None;
+                                // Set Coyotte On
+                                PlayerCurrentCoyotteState = PlayerCoyotteState.Coyotte;
                             }
                             break;
                     }
+
+                    switch (PlayerCurrentCoyotteState)
+                    {
+                        case PlayerCoyotteState.None:
+                            {
+                            }
+                            break;
+                        case PlayerCoyotteState.Coyotte:
+                            {
+                                // Coyotte Timer Check
+                                curCoyotteTime += Time.deltaTime;
+                                if (CoyotteTime <= curCoyotteTime)
+                                {
+                                    PlayerCurrentCoyotteState = PlayerCoyotteState.CoyotteEnd;
+                                }
+
+                                // All The Coyotte Actions (Jumping)
+                                PlayerJumpUpdateStateCode(PlayerCurrentJumpState);
+
+                                // Resetting Coyotte
+                                if (PlayerCurrentAirState   == PlayerAirState.Grounded ||
+                                   PlayerCurrentWallGrab == PlayerWallGrab.Grabbed)
+                                {
+                                    PlayerCurrentCoyotteState = PlayerCoyotteState.CoyotteEnd;
+                                }
+                            }
+                        break;
+                        case PlayerCoyotteState.CoyotteEnd:
+                            {
+                                curCoyotteTime = 0;
+                            }
+                            break;
+                    }
+
+
                 }
                 break;
         }
@@ -356,17 +364,6 @@ public class PlayerMovement : MonoBehaviour
                 {
                     if (Input.GetKeyDown(KeyCode.LeftShift))
                     {
-                        //if (isWallClimb)
-                        //{
-                        //    FixedOrientation = -WallOrientation;
-                        //    spriteRenderer.flipX = true;
-                        //    if (FixedOrientation > 0)
-                        //    {
-                        //        spriteRenderer.flipX = false;
-                        //    }
-                        //    isWallClimb = false;
-                        //}
-
                         PlayerCurrentDashState = PlayerDashState.StartDash;
                     }
                 }
@@ -398,49 +395,7 @@ public class PlayerMovement : MonoBehaviour
                 break;
         }
 
-        // Player Grounded 
-        switch (PlayerCurrentJumpState)
-        {
-            case PlayerJumpState.None:
-                {
-                    if (Input.GetKeyDown(KeyCode.Space))
-                    {
-                        Debug.Log("Currently pressed Space");
-                        PlayerCurrentJumpState = PlayerJumpState.JumpStarted;
-                    }
-                }
-                break;
-            case PlayerJumpState.JumpStarted:
-                {
-                    animator.SetBool("animIsJumping", true);
-                }
-                break;
-            case PlayerJumpState.JumpProgress:
-                {
-                    if (!Input.GetKeyUp(KeyCode.Space))
-                    {
-                        return;
-                    }
 
-                    if (PlayerMovementValues.SpeedY > minJumpingPower)
-                    {
-                        PlayerCurrentJumpState = PlayerJumpState.JumpInterrupted;
-                    }
-                    else
-                    {
-                        PlayerMovementValues.SpeedY = 0;
-                        PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
-                    }
-
-                }
-                break;
-            case PlayerJumpState.JumpEnded:
-                {
-                    PlayerMovementValues.SpeedY = 0;
-                    PlayerCurrentJumpState = PlayerJumpState.None;
-                }
-                break;
-        }
 
 
         // Here we change the sprite orientation
@@ -503,18 +458,6 @@ public class PlayerMovement : MonoBehaviour
         float newFrameYFloorCheckCenterPosition = newFrameYPosition  - BoxYFloorPosition;
         // We get the position of floor collision based on character size
 
-        // Coyotte timer
-        if(isCoyotte)
-        {
-            curCoyotteTime++;
-            if (CoyotteTime <= curCoyotteTime)
-            {
-                    isCoyotte = false;
-                    isCoyotteEnded = true;
-                    curCoyotteTime = 0;
-                }
-            }
-        
         // Jumping on to the platforms
         // When player falls or stays at same height, we make them collide with platforms
         if(PlayerMovementValues.SpeedY <= 0)
@@ -562,13 +505,11 @@ public class PlayerMovement : MonoBehaviour
             PlayerCurrentAirState = PlayerAirState.Air;
             // Update animation
             animator.SetBool("isLanded", false);
-            // Update airborne status
-            //isGrounded = false;
-            // If not in the jump, start coyotte timer
-            //if (!hasJumped && !isCoyotteEnded)
-            //{
-            //    isCoyotte = true;
-            //}
+            
+            if(PlayerCurrentCoyotteState == PlayerCoyotteState.None)
+            {
+                PlayerCurrentCoyotteState = PlayerCoyotteState.Coyotte;
+            }
         }
         // if there is solid ground, set player as landed
         else
@@ -586,12 +527,8 @@ public class PlayerMovement : MonoBehaviour
             //isGrounded = true;
             ////Set speed to 0
             PlayerMovementValues.SpeedY = 0;
-            //// Reset coyotte 
-            //isCoyotteEnded = false;
-            //// Reset jump
-            //hasJumped = false;
-            //// Reset dash
-            //canDash = true;
+
+            PlayerCurrentCoyotteState = PlayerCoyotteState.None;
         }
 
         //Update position for this frame (X)
@@ -738,8 +675,20 @@ public class PlayerMovement : MonoBehaviour
         //    isCoyotte = false;
         //}
         animator.SetFloat("JumpingYSpeed", PlayerMovementValues.SpeedY);
-            // Update real position
-         this.transform.position = new Vector3(newFrameXPosition, newFrameYPosition);
+        // Change animation to run if Speed is not 0
+        if (PlayerMovementValues.SpeedX != 0)
+        {
+            animator.SetBool("animIsRunning", true);
+            animator.SetBool("animIsIdle", false);
+        }
+        else
+        {
+            animator.SetBool("animIsRunning", false);
+            animator.SetBool("animIsIdle", true);
+        }
+
+        // Update real position
+        this.transform.position = new Vector3(newFrameXPosition, newFrameYPosition);
 
 
         // Save new position
@@ -748,6 +697,53 @@ public class PlayerMovement : MonoBehaviour
     }
 
     
+    void PlayerJumpUpdateStateCode(PlayerJumpState jumpState)
+    {
+        // Player Grounded jump
+        switch (jumpState)
+        {
+            case PlayerJumpState.None:
+                {
+                    if (Input.GetKeyDown(KeyCode.Space))
+                    {
+                        Debug.Log("Currently pressed Space");
+                        PlayerCurrentJumpState = PlayerJumpState.JumpStarted;
+                    }
+                }
+                break;
+            case PlayerJumpState.JumpStarted:
+                {
+                    animator.SetBool("animIsJumping", true);
+                }
+                break;
+            case PlayerJumpState.JumpProgress:
+                {
+                    if (!Input.GetKeyUp(KeyCode.Space))
+                    {
+                        return;
+                    }
+
+                    if (PlayerMovementValues.SpeedY > minJumpingPower)
+                    {
+                        PlayerCurrentJumpState = PlayerJumpState.JumpInterrupted;
+                    }
+                    else
+                    {
+                        PlayerMovementValues.SpeedY = 0;
+                        PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
+                    }
+
+                }
+                break;
+            case PlayerJumpState.JumpEnded:
+                {
+                    PlayerMovementValues.SpeedY = 0;
+                    PlayerCurrentJumpState = PlayerJumpState.None;
+                }
+                break;
+        }
+    }
+
 
     /// <summary>
     /// UtilityFunctions
