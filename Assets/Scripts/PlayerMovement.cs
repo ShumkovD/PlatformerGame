@@ -67,10 +67,11 @@ public class PlayerMovement : MonoBehaviour
     /// </summary>
     private float lastFrameXPosition;
     private float lastFrameYPosition;
-
-    private bool isGrounded = true;
     //Jumping
     private bool fallThrough = false;
+
+    private bool jumpWasPressed = false;
+    private bool dashWasPressed = false;
 
     /// <summary>
     /// Used to communicate between Update and Fixed Update functions
@@ -82,7 +83,19 @@ public class PlayerMovement : MonoBehaviour
     }
     MovementValues PlayerMovementValues;
 
+    /// <summary>
+    /// Global Player States
+    /// These states are updated in real time
+    /// </summary>
+    // Player air state <Grounded / Air>
+    public enum PlayerAirState
+    {
+        Grounded,
+        Air
+    }
+    public PlayerAirState PlayerCurrentAirState = PlayerAirState.Grounded;
 
+    // Player coyotte state
     public enum PlayerCoyotteState
     {
         None,
@@ -91,6 +104,23 @@ public class PlayerMovement : MonoBehaviour
     }
     public PlayerCoyotteState PlayerCurrentCoyotteState = PlayerCoyotteState.None;
 
+    // Player global action state
+    public enum PlayerGlobalActionState
+    {
+        None,
+        Jump,
+        WallGrabbing,
+        Dashing,
+        Attacking
+    }
+    public  PlayerGlobalActionState PlayerCurrentGlobalAction = PlayerGlobalActionState.None;
+
+
+    /// <summary>
+    /// Local Player states
+    /// These states are usually locked and while they might change from one to another, they will be overidden by the global states
+    /// </summary>
+    // Player normal jump action
     public enum PlayerJumpState
     {
         //Attack state
@@ -101,7 +131,7 @@ public class PlayerMovement : MonoBehaviour
         JumpEnded
     }
     public PlayerJumpState PlayerCurrentJumpState = PlayerJumpState.None;
-
+    // Player wall grabbing action
     public enum PlayerWallGrab
     {
         None,
@@ -110,8 +140,8 @@ public class PlayerMovement : MonoBehaviour
         EndGrabToJump,
         EndGrabToCoyotte
     }
-    PlayerWallGrab PlayerCurrentWallGrab = PlayerWallGrab.None;
-
+    public PlayerWallGrab PlayerCurrentWallGrab = PlayerWallGrab.None;
+    // Player dashing action
     public enum PlayerDashState
     {
         None,
@@ -121,13 +151,7 @@ public class PlayerMovement : MonoBehaviour
     }
     public PlayerDashState PlayerCurrentDashState = PlayerDashState.None;
 
-    public enum PlayerAirState
-    {
-        Grounded,
-        Air
-    }
-    public PlayerAirState PlayerCurrentAirState = PlayerAirState.Grounded;
-
+    // Player attacking action
     public enum PlayerAttackState
     {
         //Attack state
@@ -151,10 +175,14 @@ public class PlayerMovement : MonoBehaviour
     // Inputs
     private void Update()
     {
-        CurrentInput = (int)Input.GetAxisRaw("Horizontal");
-        // Player Speed Inputs
-        PlayerMovementValues.SpeedX = CurrentInput * HorizontalMovementSpeedMultiplier;
+        /// <summary>
+        /// Horizontal Input block
+        /// </summary>
 
+        // Save current input in to the variable
+        CurrentInput = (int)Input.GetAxisRaw("Horizontal");
+        // Player change the speed based on input
+        PlayerMovementValues.SpeedX = CurrentInput * HorizontalMovementSpeedMultiplier;
         // Set orientation of the player sprite and remember it
         if (PlayerMovementValues.SpeedX < 0)
         {
@@ -165,217 +193,404 @@ public class PlayerMovement : MonoBehaviour
             CurrentOrientation = 1;
         }
 
+        /// <summary>
+        /// Other input block \
+        /// TODO:  So depending on the need of the crouch, lying states might rework this block in to the state system
+        /// </summary>
 
+        // Here reset all the input flags
+        jumpWasPressed = false;
+        dashWasPressed  = false;
 
-
-       // If pressed S,
+        // Fall through
         if (Input.GetKey(KeyCode.S))
         {
-            //And space, while on the ground and not dashing, 
-            if (/*Input.GetKeyDown(KeyCode.Space) &&*/ PlayerCurrentAirState ==  PlayerAirState.Grounded)
+            // If S and If Space were pressed 
+            if (Input.GetKeyDown(KeyCode.Space) &&
+                // While grounded
+                PlayerCurrentAirState ==  PlayerAirState.Grounded)
             {
-                // Fall through
+                // We set fall through flag
                 fallThrough = true;
             }
         }
-
-
-        // Player Air
-        switch (PlayerCurrentAirState)
+        // Jump processing
+        else
+        // We do the normal jump if ÅufallThroughÅv button is not pressed
         {
-            case PlayerAirState.Grounded:
+            //We will only set the flag. All the relations and state changes will be decided by the Global system
+            if (Input.GetKeyDown(KeyCode.Space))
+            {
+                jumpWasPressed = true;
+            }
+        }
+
+        // Dashing
+        if(Input.GetKeyDown(KeyCode.LeftShift))
+        {
+            dashWasPressed = true;
+        }
+        /// <summary>
+        /// STATE CHANGES BLOCK
+        /// </summary>
+
+
+
+        // Here process all the actions for player to do
+        switch (PlayerCurrentGlobalAction)
+        {
+            // Here process all the inputs to change the states
+            case PlayerGlobalActionState.None:
                 {
-                    // Player Grounded Attack Code
-                    switch (PlayerCurrentAttackState)
+                    //Jump was pressed, 
+                    if (jumpWasPressed)
                     {
-                        //PlayerAttackState
-                        case PlayerAttackState.None:
-                            {
-                                if (Input.GetMouseButtonDown(0))
-                                {
-                                    currentAttackNum = 0;
-                                    AttackOrientation = CurrentOrientation;
-                                    //
-                                    PlayerCurrentAttackState = PlayerAttackState.AttackStarted;
-                                }
-                                break;
-                            }
-                        case PlayerAttackState.AttackStarted:
-                            {
-                                currentAttackNum++;
-                                animator.SetTrigger("isAttack");
-                                animator.SetBool("hasAttackEnded", false);
-                                PlayerCurrentAttackState = PlayerAttackState.AttackProgress;
-                            }
-                            break;
-                        case PlayerAttackState.AttackProgress:
-                            {
-                                if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.5f)
-                                {
-                                    PlayerCurrentAttackState = PlayerAttackState.AttackTransition;
-                                }
-                            }
-                            break;
-                        case PlayerAttackState.AttackTransition:
-                            {
-                                if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
-                                {
-                                    animator.SetBool("hasAttackEnded", true);
-                                    PlayerCurrentAttackState = PlayerAttackState.None;
-                                    break;
-                                }
+                        // Reset is probably not needed, but to keep things clean will put it here
+                        jumpWasPressed = false;
 
-                                if (Input.GetMouseButtonDown(0) && currentAttackNum < 3)
-                                {
-                                    PlayerCurrentAttackState = PlayerAttackState.AttackDowntime;
-                                }
-                            }
+                        // Here we check for global checks
+                        // If Is not Grounded and not Coyotte cannot jump
+                        if (PlayerCurrentAirState != PlayerAirState.Grounded && PlayerCurrentCoyotteState != PlayerCoyotteState.Coyotte)
                             break;
-                        case PlayerAttackState.AttackDowntime:
-                            {
-                                if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
-                                {
-                                    PlayerCurrentAttackState = PlayerAttackState.AttackStarted;
-                                }
 
-                                break;
-                            }
-                    }
-                    // Player Jump State Code
-                    PlayerJumpUpdateStateCode(PlayerCurrentJumpState);
-                }
-                break;
-            case PlayerAirState.Air:
-                {
-                    // Player Wall Grabbing
-                    switch (PlayerCurrentWallGrab)
-                    {
-                        case PlayerWallGrab.None:
-                            {
-                                // If input is in the direction of the wall
-                                if (CurrentInput == CurrentWallPosition &&
-                                    // Where is a wall collision
-                                    CurrentWallPosition != 0 &&
-                                    // And character is in the position to logically grab the ledge / wall
-                                    MaxYPosOfAWall >= this.transform.position.y + HandReachYHeight &&
-                                     //And at last player is falling
-                                     PlayerMovementValues.SpeedY <= 0
-                                    )
-                                {
-                                    // Start Grabbing the ledge
-                                    PlayerCurrentWallGrab = PlayerWallGrab.StartGrab;
-                                }
-                            }
-                            break;
-                        case PlayerWallGrab.StartGrab:
-                            {
-                                animator.SetBool("animWallWait", true);
-                                PlayerCurrentWallGrab = PlayerWallGrab.Grabbed;
-                                WallOrientation = CurrentWallPosition;
-                            }
-                            break;
-                        case PlayerWallGrab.Grabbed:
-                            {
-                                if (CurrentInput == -WallOrientation)
-                                {
-                                    PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToCoyotte;
-                                }
-                                if (Input.GetKeyDown(KeyCode.Space))
-                                {
-                                    PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToJump;
-                                }
-                            }
-                            break;
-                        case PlayerWallGrab.EndGrabToJump:
-                            {
-                                animator.SetBool("animWallWait", false);
-                                PlayerCurrentWallGrab = PlayerWallGrab.None;
-                            }
-                            break;
-                        case PlayerWallGrab.EndGrabToCoyotte:
-                            {
-                                animator.SetBool("animWallWait", false);
-                                PlayerCurrentWallGrab = PlayerWallGrab.None;
-                                // Set Coyotte On
-                                PlayerCurrentCoyotteState = PlayerCoyotteState.Coyotte;
-                            }
-                            break;
-                    }
-
-                    switch (PlayerCurrentCoyotteState)
-                    {
-                        case PlayerCoyotteState.None:
-                            {
-                            }
-                            break;
-                        case PlayerCoyotteState.Coyotte:
-                            {
-                                // Coyotte Timer Check
-                                curCoyotteTime += Time.deltaTime;
-                                if (CoyotteTime <= curCoyotteTime)
-                                {
-                                    PlayerCurrentCoyotteState = PlayerCoyotteState.CoyotteEnd;
-                                }
-
-                                // All The Coyotte Actions (Jumping)
-                                PlayerJumpUpdateStateCode(PlayerCurrentJumpState);
-
-                                // Resetting Coyotte
-                                if (PlayerCurrentAirState   == PlayerAirState.Grounded ||
-                                   PlayerCurrentWallGrab == PlayerWallGrab.Grabbed)
-                                {
-                                    PlayerCurrentCoyotteState = PlayerCoyotteState.CoyotteEnd;
-                                }
-                            }
+                        PlayerCurrentGlobalAction = PlayerGlobalActionState.Jump;
                         break;
-                        case PlayerCoyotteState.CoyotteEnd:
+                    }
+                    //Dash was pressed, so do the dash
+                    if (dashWasPressed)
+                    {
+                        PlayerCurrentGlobalAction = PlayerGlobalActionState.Dashing;
+                        // Reset is not needed, but to keep things clean will put it here
+                        dashWasPressed = false;
+                        break;
+                    }
+                }
+                break;
+                // Player global jumping state
+            case PlayerGlobalActionState.Jump:
+                {
+                    // Player Local jumping state
+                    switch (PlayerCurrentJumpState)
+                    {
+                        // Default Jumping state, used as a transition in to the Jump
+                        case PlayerJumpState.None:
                             {
-                                curCoyotteTime = 0;
+                                    PlayerCurrentJumpState = PlayerJumpState.JumpStarted;
+                            }
+                            break;
+
+                        // Jump started, used to change the animations in update and physical properties in Fixed update
+                        case PlayerJumpState.JumpStarted:
+                            {
+                                animator.SetBool("animIsJumping", true);
+                            }
+                            break;
+
+                        // While GetKeyDown is used to change states, here we use GetKeyUp, as it does not have any influence on the other states and fully local
+                        //TODO: Will need to fix the interruption and space input
+                        case PlayerJumpState.JumpProgress:
+                            {
+                                // In case of dash being pressed, Jump is being ended in to the dash.
+                                if(dashWasPressed)
+                                {
+                                    PlayerCurrentJumpState = PlayerJumpState.None;
+                                    PlayerCurrentGlobalAction = PlayerGlobalActionState.Dashing;
+                                }
+
+                                //If player does not stop to press space, no need to interrupt the jump
+                                if (!Input.GetKeyUp(KeyCode.Space)) 
+                                {
+                                    return;
+                                }
+                                // If players speed is less or 0, player already is falling, so no need to do anything as well
+                                if (PlayerMovementValues.SpeedY <= 0)
+                                {
+                                    return;
+                                }
+
+
+                                // In case if SpeedY is more than minimal jumping power
+                                if (PlayerMovementValues.SpeedY > minJumpingPower)
+                                {
+                                    // Interrupt it
+                                    PlayerCurrentJumpState = PlayerJumpState.JumpInterrupted;
+                                }
+                                else
+                                {
+                                    // Continue until can Interrupt
+                                    PlayerMovementValues.SpeedY = 0;
+                                    PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
+                                }
+                            }
+                            break;
+                        case PlayerJumpState.JumpInterrupted:
+                            {
+                                // In case of dash being pressed, Jump is being ended in to the dash.
+                                if (dashWasPressed)
+                                {
+                                    PlayerCurrentJumpState = PlayerJumpState.None;
+                                    PlayerCurrentGlobalAction = PlayerGlobalActionState.Dashing;
+                                }
+                            }
+                            break;
+                        // Resetting all the values
+                        case PlayerJumpState.JumpEnded:
+                            {
+                                PlayerMovementValues.SpeedY = 0;
+                                //Set None for Player Jump as a default State
+                                PlayerCurrentJumpState = PlayerJumpState.None;
+                                // Reset global action to not be jump anymore
+                                PlayerCurrentGlobalAction = PlayerGlobalActionState.None;
                             }
                             break;
                     }
-
-
                 }
                 break;
-        }
-        // Player Dashing
-        switch (PlayerCurrentDashState)
-        {
-            case PlayerDashState.None:
+            case PlayerGlobalActionState.Dashing:
                 {
-                    if (Input.GetKeyDown(KeyCode.LeftShift))
+                    switch (PlayerCurrentDashState)
                     {
-                        PlayerCurrentDashState = PlayerDashState.StartDash;
+                        // Default Dashing state, used as a transition in to the dash
+                        case PlayerDashState.None:
+                            {
+                                PlayerCurrentDashState = PlayerDashState.StartDash;
+                            }
+                            break;
+                        // Dash started, used to change the animations in update and timer for the lenght of the dash
+                        case PlayerDashState.StartDash:
+                            {
+                                currentDashTime = 0;
+                                animator.SetBool("animDash", true);
+                                FixedOrientation = CurrentOrientation;
+                                PlayerCurrentDashState = PlayerDashState.Dash;
+                            }
+                            break;
+                            //Here calculate the length of the dash
+                        case PlayerDashState.Dash:
+                            {
+                                currentDashTime += Time.deltaTime;
+                                CurrentOrientation = FixedOrientation;
+                                if (currentDashTime >= DashTime)
+                                {
+                                    PlayerCurrentDashState = PlayerDashState.EndDash;
+                                }
+                            }
+                            break;
+                        case PlayerDashState.EndDash:
+                            {
+                                currentDashTime = 0;
+                                // Dash is ended from the fixed update, because of the physical aspect 
+                                // TODO: Rework physics or at least make them work better with state machine
+                            }
+                            break;
                     }
                 }
                 break;
-            case PlayerDashState.StartDash:
+            case PlayerGlobalActionState.WallGrabbing:
                 {
-                    currentDashTime = 0;
-                    animator.SetBool("animDash", true);
-                    FixedOrientation = CurrentOrientation;
-                    PlayerCurrentDashState = PlayerDashState.Dash;
                 }
                 break;
-            case PlayerDashState.Dash:
+            case PlayerGlobalActionState.Attacking:
                 {
-                    currentDashTime += Time.deltaTime;
-                    CurrentOrientation = FixedOrientation;
-                    if (currentDashTime >= DashTime)
-                    {
-                        PlayerCurrentDashState = PlayerDashState.EndDash;
-                    }
-                }
-                break;
-            case PlayerDashState.EndDash:
-                {
-                    animator.SetBool("animDash", false);
-                    currentDashTime = 0;
-                    PlayerCurrentDashState = PlayerDashState.None;
                 }
                 break;
         }
+
+
+        //// Player Air
+        //switch (PlayerCurrentAirState)
+        //{
+        //    case PlayerAirState.Grounded:
+        //        {
+        //            // Player Grounded Attack Code
+        //            switch (PlayerCurrentAttackState)
+        //            {
+        //                //PlayerAttackState
+        //                case PlayerAttackState.None:
+        //                    {
+        //                        if (Input.GetMouseButtonDown(0))
+        //                        {
+        //                            currentAttackNum = 0;
+        //                            AttackOrientation = CurrentOrientation;
+        //                            //
+        //                            PlayerCurrentAttackState = PlayerAttackState.AttackStarted;
+        //                        }
+        //                        break;
+        //                    }
+        //                case PlayerAttackState.AttackStarted:
+        //                    {
+        //                        currentAttackNum++;
+        //                        animator.SetTrigger("isAttack");
+        //                        animator.SetBool("hasAttackEnded", false);
+        //                        PlayerCurrentAttackState = PlayerAttackState.AttackProgress;
+        //                    }
+        //                    break;
+        //                case PlayerAttackState.AttackProgress:
+        //                    {
+        //                        if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.5f)
+        //                        {
+        //                            PlayerCurrentAttackState = PlayerAttackState.AttackTransition;
+        //                        }
+        //                    }
+        //                    break;
+        //                case PlayerAttackState.AttackTransition:
+        //                    {
+        //                        if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
+        //                        {
+        //                            animator.SetBool("hasAttackEnded", true);
+        //                            PlayerCurrentAttackState = PlayerAttackState.None;
+        //                            break;
+        //                        }
+
+        //                        if (Input.GetMouseButtonDown(0) && currentAttackNum < 3)
+        //                        {
+        //                            PlayerCurrentAttackState = PlayerAttackState.AttackDowntime;
+        //                        }
+        //                    }
+        //                    break;
+        //                case PlayerAttackState.AttackDowntime:
+        //                    {
+        //                        if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
+        //                        {
+        //                            PlayerCurrentAttackState = PlayerAttackState.AttackStarted;
+        //                        }
+
+        //                        break;
+        //                    }
+        //            }
+     
+        //        }
+        //        break;
+        //    case PlayerAirState.Air:
+        //        {
+        //            // Player Wall Grabbing
+        //            switch (PlayerCurrentWallGrab)
+        //            {
+        //                case PlayerWallGrab.None:
+        //                    {
+        //                        // If input is in the direction of the wall
+        //                        if (CurrentInput == CurrentWallPosition &&
+        //                            // Where is a wall collision
+        //                            CurrentWallPosition != 0 &&
+        //                            // And character is in the position to logically grab the ledge / wall
+        //                            MaxYPosOfAWall >= this.transform.position.y + HandReachYHeight &&
+        //                             //And at last player is falling
+        //                             PlayerMovementValues.SpeedY <= 0
+        //                            )
+        //                        {
+        //                            // Start Grabbing the ledge
+        //                            PlayerCurrentWallGrab = PlayerWallGrab.StartGrab;
+        //                        }
+        //                    }
+        //                    break;
+        //                case PlayerWallGrab.StartGrab:
+        //                    {
+        //                        animator.SetBool("animWallWait", true);
+        //                        PlayerCurrentWallGrab = PlayerWallGrab.Grabbed;
+        //                        WallOrientation = CurrentWallPosition;
+        //                    }
+        //                    break;
+        //                case PlayerWallGrab.Grabbed:
+        //                    {
+        //                        if (CurrentInput == -WallOrientation)
+        //                        {
+        //                            PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToCoyotte;
+        //                        }
+        //                        if (Input.GetKeyDown(KeyCode.Space))
+        //                        {
+        //                            PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToJump;
+        //                        }
+        //                    }
+        //                    break;
+        //                case PlayerWallGrab.EndGrabToJump:
+        //                    {
+        //                        animator.SetBool("animWallWait", false);
+        //                        PlayerCurrentWallGrab = PlayerWallGrab.None;
+        //                    }
+        //                    break;
+        //                case PlayerWallGrab.EndGrabToCoyotte:
+        //                    {
+        //                        animator.SetBool("animWallWait", false);
+        //                        PlayerCurrentWallGrab = PlayerWallGrab.None;
+        //                        // Set Coyotte On
+        //                        PlayerCurrentCoyotteState = PlayerCoyotteState.Coyotte;
+        //                    }
+        //                    break;
+        //            }
+
+        //            switch (PlayerCurrentCoyotteState)
+        //            {
+        //                case PlayerCoyotteState.None:
+        //                    {
+        //                    }
+        //                    break;
+        //                case PlayerCoyotteState.Coyotte:
+        //                    {
+        //                        // Coyotte Timer Check
+        //                        curCoyotteTime += Time.deltaTime;
+        //                        if (CoyotteTime <= curCoyotteTime)
+        //                        {
+        //                            PlayerCurrentCoyotteState = PlayerCoyotteState.CoyotteEnd;
+        //                        }
+
+
+
+        //                        // Resetting Coyotte
+        //                        if (PlayerCurrentAirState   == PlayerAirState.Grounded ||
+        //                           PlayerCurrentWallGrab == PlayerWallGrab.Grabbed)
+        //                        {
+        //                            PlayerCurrentCoyotteState = PlayerCoyotteState.CoyotteEnd;
+        //                        }
+        //                    }
+        //                break;
+        //                case PlayerCoyotteState.CoyotteEnd:
+        //                    {
+        //                        curCoyotteTime = 0;
+        //                    }
+        //                    break;
+        //            }
+
+
+        //        }
+        //        break;
+        //}
+        //// Player Dashing
+        //switch (PlayerCurrentDashState)
+        //{
+        //    case PlayerDashState.None:
+        //        {
+        //            if (Input.GetKeyDown(KeyCode.LeftShift))
+        //            {
+        //                PlayerCurrentDashState = PlayerDashState.StartDash;
+        //            }
+        //        }
+        //        break;
+        //    case PlayerDashState.StartDash:
+        //        {
+        //            currentDashTime = 0;
+        //            animator.SetBool("animDash", true);
+        //            FixedOrientation = CurrentOrientation;
+        //            PlayerCurrentDashState = PlayerDashState.Dash;
+        //        }
+        //        break;
+        //    case PlayerDashState.Dash:
+        //        {
+        //            currentDashTime += Time.deltaTime;
+        //            CurrentOrientation = FixedOrientation;
+        //            if (currentDashTime >= DashTime)
+        //            {
+        //                PlayerCurrentDashState = PlayerDashState.EndDash;
+        //            }
+        //        }
+        //        break;
+        //    case PlayerDashState.EndDash:
+        //        {
+        //            animator.SetBool("animDash", false);
+        //            currentDashTime = 0;
+        //            PlayerCurrentDashState = PlayerDashState.None;
+        //        }
+        //        break;
+        //}
 
 
 
@@ -411,7 +626,7 @@ public class PlayerMovement : MonoBehaviour
                 break;
             case PlayerJumpState.JumpInterrupted:
                 {
-                    if(PlayerMovementValues.SpeedY < 0)
+                    if (PlayerMovementValues.SpeedY < 0)
                     {
                         PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
                     }
@@ -469,7 +684,7 @@ public class PlayerMovement : MonoBehaviour
         Collider2D floorCollision = Physics2D.OverlapBox(new Vector2(transform.position.x, newFrameYFloorCheckCenterPosition), new Vector2(BoxXCollisionSize, BoxYFloorCollisionCheck), 0f, LayerToIgnoreFloorCollision);
 
         // If player is not grounded and falling , we additionally check for floors player could go through on the high speed
-        if (!isGrounded && PlayerMovementValues.SpeedY < -0.1f)
+        if (PlayerMovementValues.SpeedY < -0.1f)
         {
             Vector2 newPos = new Vector2(transform.position.x, newFrameYFloorCheckCenterPosition);
             Vector2 oldPos = new Vector2(lastFrameXPosition, lastFrameYPosition - BoxYFloorPosition);
@@ -528,7 +743,11 @@ public class PlayerMovement : MonoBehaviour
                 break;
             case PlayerDashState.EndDash:
                 {
+                    animator.SetBool("animDash", false);
                     PlayerMovementValues.SpeedY = 0;
+                    PlayerCurrentDashState = PlayerDashState.None;
+                    // Reset global action to not be dash anymore
+                    PlayerCurrentGlobalAction = PlayerGlobalActionState.None;
                 }
                 break;
         }
@@ -678,53 +897,6 @@ public class PlayerMovement : MonoBehaviour
         lastFrameYPosition = newFrameYPosition;
     }
 
-    
-    void PlayerJumpUpdateStateCode(PlayerJumpState jumpState)
-    {
-        // Player Grounded jump
-        switch (jumpState)
-        {
-            case PlayerJumpState.None:
-                {
-                    if (Input.GetKeyDown(KeyCode.Space))
-                    {
-                        Debug.Log("Currently pressed Space");
-                        PlayerCurrentJumpState = PlayerJumpState.JumpStarted;
-                    }
-                }
-                break;
-            case PlayerJumpState.JumpStarted:
-                {
-                    animator.SetBool("animIsJumping", true);
-                }
-                break;
-            case PlayerJumpState.JumpProgress:
-                {
-                    if (!Input.GetKeyUp(KeyCode.Space))
-                    {
-                        return;
-                    }
-
-                    if (PlayerMovementValues.SpeedY > minJumpingPower)
-                    {
-                        PlayerCurrentJumpState = PlayerJumpState.JumpInterrupted;
-                    }
-                    else
-                    {
-                        PlayerMovementValues.SpeedY = 0;
-                        PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
-                    }
-
-                }
-                break;
-            case PlayerJumpState.JumpEnded:
-                {
-                    PlayerMovementValues.SpeedY = 0;
-                    PlayerCurrentJumpState = PlayerJumpState.None;
-                }
-                break;
-        }
-    }
 
 
     /// <summary>
