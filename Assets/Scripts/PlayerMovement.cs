@@ -11,7 +11,7 @@ public class PlayerMovement : MonoBehaviour
     #region Changable Variables
 
     [SerializeField, Header("Normal Movement Values")]
-                            float HorizontalMovementSpeedMultiplier = 0.1f;
+    float HorizontalMovementSpeedMultiplier = 0.1f;
     [SerializeField] float JumpingImpulse = 5;
     [SerializeField] float minJumpingPower = 0.5f;
     [SerializeField] float GravityValue = -5;
@@ -20,20 +20,20 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] int CurrentOrientation = -1;
 
     [SerializeField, Header("Dash Movement Values")]
-     float DashTime = 0.5f;
+    float DashTime = 0.5f;
     [SerializeField] int FixedOrientation = -1;
     [SerializeField] int DashSpeedMultiplier = 3;
     private float currentDashTime;
 
     [SerializeField, Header("Collision Values")]
-                             float BoxXCollisionSize = 0.5f;
-    [SerializeField]  float BoxYCollisionSize = 1f;
-    [SerializeField]  float BoxYFloorCollisionCheck = 0.2f;
-    [SerializeField]  float BoxYHeadCollisionCheck = 0.2f;
+    float BoxXCollisionSize = 0.5f;
+    [SerializeField] float BoxYCollisionSize = 1f;
+    [SerializeField] float BoxYFloorCollisionCheck = 0.2f;
+    [SerializeField] float BoxYHeadCollisionCheck = 0.2f;
 
-    [SerializeField]  float BoxYHeadPosition = 0.9f;
-    [SerializeField]  float BoxYFloorPosition = 0.9f;
-    [SerializeField]  int FallThroughTime = 5;
+    [SerializeField] float BoxYHeadPosition = 0.9f;
+    [SerializeField] float BoxYFloorPosition = 0.9f;
+    [SerializeField] int FallThroughTime = 5;
     private int fallThroughCurTime = 0;
 
     [SerializeField, Header("Wall Climbing")]
@@ -49,9 +49,9 @@ public class PlayerMovement : MonoBehaviour
     private int AttackOrientation = 0;
     #endregion
 
-   public  int LayerToIgnoreHeadCollision = 6;
-   public  int LayerToIgnoreFloorCollision = 6;
-   public  int LayerToIgnoreXCollision = 6;
+    public int LayerToIgnoreHeadCollision = 6;
+    public int LayerToIgnoreFloorCollision = 6;
+    public int LayerToIgnoreXCollision = 6;
 
     Animator animator;
     SpriteRenderer spriteRenderer;
@@ -72,6 +72,7 @@ public class PlayerMovement : MonoBehaviour
 
     private bool jumpWasPressed = false;
     private bool dashWasPressed = false;
+    private bool attackWasPressed = false;
 
     /// <summary>
     /// Used to communicate between Update and Fixed Update functions
@@ -113,7 +114,7 @@ public class PlayerMovement : MonoBehaviour
         Dashing,
         Attacking
     }
-    public  PlayerGlobalActionState PlayerCurrentGlobalAction = PlayerGlobalActionState.None;
+    public PlayerGlobalActionState PlayerCurrentGlobalAction = PlayerGlobalActionState.None;
 
 
     /// <summary>
@@ -200,15 +201,15 @@ public class PlayerMovement : MonoBehaviour
 
         // Here reset all the input flags
         jumpWasPressed = false;
-        dashWasPressed  = false;
-
+        dashWasPressed = false;
+        attackWasPressed = false;
         // Fall through
         if (Input.GetKey(KeyCode.S))
         {
             // If S and If Space were pressed 
             if (Input.GetKeyDown(KeyCode.Space) &&
                 // While grounded
-                PlayerCurrentAirState ==  PlayerAirState.Grounded)
+                PlayerCurrentAirState == PlayerAirState.Grounded)
             {
                 // We set fall through flag
                 fallThrough = true;
@@ -226,9 +227,15 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // Dashing
-        if(Input.GetKeyDown(KeyCode.LeftShift))
+        if (Input.GetKeyDown(KeyCode.LeftShift))
         {
             dashWasPressed = true;
+        }
+
+        // Mouse Input (Attack)
+        if (Input.GetMouseButtonDown(0))
+        {
+            attackWasPressed = true;
         }
         /// <summary>
         /// STATE CHANGES BLOCK
@@ -264,9 +271,18 @@ public class PlayerMovement : MonoBehaviour
                         dashWasPressed = false;
                         break;
                     }
+
+                    if(attackWasPressed)
+                    {
+                        PlayerCurrentGlobalAction = PlayerGlobalActionState.Attacking;
+                        // Reset is not needed, but to keep things clean will put it here
+                        attackWasPressed = false;
+                        break;
+                    }
                 }
                 break;
-                // Player global jumping state
+
+            // Player global jumping state
             case PlayerGlobalActionState.Jump:
                 {
                     // Player Local jumping state
@@ -275,14 +291,21 @@ public class PlayerMovement : MonoBehaviour
                         // Default Jumping state, used as a transition in to the Jump
                         case PlayerJumpState.None:
                             {
-                                    PlayerCurrentJumpState = PlayerJumpState.JumpStarted;
+                                PlayerCurrentJumpState = PlayerJumpState.JumpStarted;
                             }
                             break;
 
                         // Jump started, used to change the animations in update and physical properties in Fixed update
                         case PlayerJumpState.JumpStarted:
                             {
+                                // Set jumping inpulse
+                                PlayerMovementValues.SpeedY = JumpingImpulse;
+                                // Set animation start
                                 animator.SetBool("animIsJumping", true);
+                                // Here set player to be in the air (Reason for that is first JumpProgress will cancel on grounded)
+                                PlayerCurrentAirState = PlayerAirState.Air;
+                                // Go to progress
+                                PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
                             }
                             break;
 
@@ -291,23 +314,29 @@ public class PlayerMovement : MonoBehaviour
                         case PlayerJumpState.JumpProgress:
                             {
                                 // In case of dash being pressed, Jump is being ended in to the dash.
-                                if(dashWasPressed)
+                                if (dashWasPressed)
                                 {
                                     PlayerCurrentJumpState = PlayerJumpState.None;
                                     PlayerCurrentGlobalAction = PlayerGlobalActionState.Dashing;
+                                    break;
+                                }
+
+                                if (PlayerCurrentAirState == PlayerAirState.Grounded)
+                                {
+                                    PlayerCurrentJumpState = PlayerJumpState.JumpEnded;
+                                    break;
                                 }
 
                                 //If player does not stop to press space, no need to interrupt the jump
-                                if (!Input.GetKeyUp(KeyCode.Space)) 
+                                if (!Input.GetKeyUp(KeyCode.Space))
                                 {
-                                    return;
+                                    break;
                                 }
                                 // If players speed is less or 0, player already is falling, so no need to do anything as well
                                 if (PlayerMovementValues.SpeedY <= 0)
                                 {
-                                    return;
+                                    break;
                                 }
-
 
                                 // In case if SpeedY is more than minimal jumping power
                                 if (PlayerMovementValues.SpeedY > minJumpingPower)
@@ -331,6 +360,18 @@ public class PlayerMovement : MonoBehaviour
                                     PlayerCurrentJumpState = PlayerJumpState.None;
                                     PlayerCurrentGlobalAction = PlayerGlobalActionState.Dashing;
                                 }
+
+                                if (PlayerMovementValues.SpeedY < 0)
+                                {
+                                    PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
+                                }
+
+                                if (PlayerMovementValues.SpeedY <= minJumpingPower)
+                                {
+                                    PlayerMovementValues.SpeedY = 0;
+                                    PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
+                                }
+
                             }
                             break;
                         // Resetting all the values
@@ -365,7 +406,7 @@ public class PlayerMovement : MonoBehaviour
                                 PlayerCurrentDashState = PlayerDashState.Dash;
                             }
                             break;
-                            //Here calculate the length of the dash
+                        //Here calculate the length of the dash
                         case PlayerDashState.Dash:
                             {
                                 currentDashTime += Time.deltaTime;
@@ -378,9 +419,12 @@ public class PlayerMovement : MonoBehaviour
                             break;
                         case PlayerDashState.EndDash:
                             {
+                                animator.SetBool("animDash", false);
+                                PlayerMovementValues.SpeedY = 0;
+                                PlayerCurrentDashState = PlayerDashState.None;
                                 currentDashTime = 0;
-                                // Dash is ended from the fixed update, because of the physical aspect 
-                                // TODO: Rework physics or at least make them work better with state machine
+                                // Reset global action to not be dash anymore
+                                PlayerCurrentGlobalAction = PlayerGlobalActionState.None;
                             }
                             break;
                     }
@@ -388,10 +432,69 @@ public class PlayerMovement : MonoBehaviour
                 break;
             case PlayerGlobalActionState.WallGrabbing:
                 {
+
                 }
                 break;
             case PlayerGlobalActionState.Attacking:
                 {
+                    //Player Grounded Attack Code
+                    switch (PlayerCurrentAttackState)
+                    {
+                        //PlayerAttackState
+                        case PlayerAttackState.None:
+                            {
+                                    currentAttackNum = 0;
+                                    PlayerCurrentAttackState = PlayerAttackState.AttackStarted;
+                            }
+                            break;
+                        case PlayerAttackState.AttackStarted:
+                            {
+                                AttackOrientation = CurrentOrientation;
+                                currentAttackNum++;
+                                animator.SetTrigger("isAttack");
+                                animator.SetBool("hasAttackEnded", false);
+                                PlayerCurrentAttackState = PlayerAttackState.AttackProgress;
+                            }
+                            break;
+                        case PlayerAttackState.AttackProgress:
+                            {
+                                CurrentOrientation = AttackOrientation;
+                                if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.5f)
+                                {
+                                    PlayerCurrentAttackState = PlayerAttackState.AttackTransition;
+                                }
+                            }
+                            break;
+                        case PlayerAttackState.AttackTransition:
+                            {
+                                CurrentOrientation = AttackOrientation;
+                                if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
+                                {
+                                    animator.SetBool("hasAttackEnded", true);
+                                    PlayerCurrentAttackState = PlayerAttackState.None;
+                                    // Reset global action to none
+                                    PlayerCurrentGlobalAction = PlayerGlobalActionState.None;
+                                    break;
+                                }
+                                // Attack was pressed
+                                // And current attack combo is less than amount of attacks in combo
+                                if (attackWasPressed && currentAttackNum < 3)
+                                {
+                                    PlayerCurrentAttackState = PlayerAttackState.AttackDowntime;
+                                }
+                            }
+                            break;
+                        case PlayerAttackState.AttackDowntime:
+                            {
+                                CurrentOrientation = AttackOrientation;
+                                if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
+                                {
+                                    PlayerCurrentAttackState = PlayerAttackState.AttackStarted;
+                                }
+
+                                break;
+                            }
+                    }
                 }
                 break;
         }
@@ -400,68 +503,7 @@ public class PlayerMovement : MonoBehaviour
         //// Player Air
         //switch (PlayerCurrentAirState)
         //{
-        //    case PlayerAirState.Grounded:
-        //        {
-        //            // Player Grounded Attack Code
-        //            switch (PlayerCurrentAttackState)
-        //            {
-        //                //PlayerAttackState
-        //                case PlayerAttackState.None:
-        //                    {
-        //                        if (Input.GetMouseButtonDown(0))
-        //                        {
-        //                            currentAttackNum = 0;
-        //                            AttackOrientation = CurrentOrientation;
-        //                            //
-        //                            PlayerCurrentAttackState = PlayerAttackState.AttackStarted;
-        //                        }
-        //                        break;
-        //                    }
-        //                case PlayerAttackState.AttackStarted:
-        //                    {
-        //                        currentAttackNum++;
-        //                        animator.SetTrigger("isAttack");
-        //                        animator.SetBool("hasAttackEnded", false);
-        //                        PlayerCurrentAttackState = PlayerAttackState.AttackProgress;
-        //                    }
-        //                    break;
-        //                case PlayerAttackState.AttackProgress:
-        //                    {
-        //                        if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime > 0.5f)
-        //                        {
-        //                            PlayerCurrentAttackState = PlayerAttackState.AttackTransition;
-        //                        }
-        //                    }
-        //                    break;
-        //                case PlayerAttackState.AttackTransition:
-        //                    {
-        //                        if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
-        //                        {
-        //                            animator.SetBool("hasAttackEnded", true);
-        //                            PlayerCurrentAttackState = PlayerAttackState.None;
-        //                            break;
-        //                        }
 
-        //                        if (Input.GetMouseButtonDown(0) && currentAttackNum < 3)
-        //                        {
-        //                            PlayerCurrentAttackState = PlayerAttackState.AttackDowntime;
-        //                        }
-        //                    }
-        //                    break;
-        //                case PlayerAttackState.AttackDowntime:
-        //                    {
-        //                        if (animator.GetCurrentAnimatorStateInfo(0).IsName("Attack " + currentAttackNum.ToString()) && animator.GetCurrentAnimatorStateInfo(0).normalizedTime >= 1.0f && !animator.IsInTransition(0))
-        //                        {
-        //                            PlayerCurrentAttackState = PlayerAttackState.AttackStarted;
-        //                        }
-
-        //                        break;
-        //                    }
-        //            }
-     
-        //        }
-        //        break;
-        //    case PlayerAirState.Air:
         //        {
         //            // Player Wall Grabbing
         //            switch (PlayerCurrentWallGrab)
@@ -550,48 +592,7 @@ public class PlayerMovement : MonoBehaviour
         //                    break;
         //            }
 
-
-        //        }
-        //        break;
-        //}
-        //// Player Dashing
-        //switch (PlayerCurrentDashState)
-        //{
-        //    case PlayerDashState.None:
-        //        {
-        //            if (Input.GetKeyDown(KeyCode.LeftShift))
-        //            {
-        //                PlayerCurrentDashState = PlayerDashState.StartDash;
-        //            }
-        //        }
-        //        break;
-        //    case PlayerDashState.StartDash:
-        //        {
-        //            currentDashTime = 0;
-        //            animator.SetBool("animDash", true);
-        //            FixedOrientation = CurrentOrientation;
-        //            PlayerCurrentDashState = PlayerDashState.Dash;
-        //        }
-        //        break;
-        //    case PlayerDashState.Dash:
-        //        {
-        //            currentDashTime += Time.deltaTime;
-        //            CurrentOrientation = FixedOrientation;
-        //            if (currentDashTime >= DashTime)
-        //            {
-        //                PlayerCurrentDashState = PlayerDashState.EndDash;
-        //            }
-        //        }
-        //        break;
-        //    case PlayerDashState.EndDash:
-        //        {
-        //            animator.SetBool("animDash", false);
-        //            currentDashTime = 0;
-        //            PlayerCurrentDashState = PlayerDashState.None;
-        //        }
-        //        break;
-        //}
-
+    
 
 
 
@@ -611,53 +612,26 @@ public class PlayerMovement : MonoBehaviour
     private void FixedUpdate()
     {
 
-        if(PlayerCurrentAttackState != PlayerAttackState.None)
+        if (PlayerCurrentGlobalAction == PlayerGlobalActionState.Attacking)
         {
             return;
         }
 
-        switch (PlayerCurrentJumpState)
-        {
-            case PlayerJumpState.JumpStarted:
-                {
-                    PlayerMovementValues.SpeedY = JumpingImpulse;
-                    PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
-                }
-                break;
-            case PlayerJumpState.JumpInterrupted:
-                {
-                    if (PlayerMovementValues.SpeedY < 0)
-                    {
-                        PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
-                    }
-
-                    if (PlayerMovementValues.SpeedY <= minJumpingPower)
-                    {
-                        PlayerMovementValues.SpeedY = 0;
-                        PlayerCurrentJumpState = PlayerJumpState.JumpProgress;
-                    }
-                }
-                break;
-            case PlayerJumpState.JumpProgress:
-                {
-                    if (PlayerCurrentAirState == PlayerAirState.Grounded)
-                    {
-                        PlayerCurrentJumpState = PlayerJumpState.JumpEnded;
-                    }
-                }
-                break;
-        }
-
         // Update Jumping Speed (Y)
-        PlayerMovementValues.SpeedY  += GravityValue * Time.deltaTime; // Because time squared
+        PlayerMovementValues.SpeedY += GravityValue * Time.deltaTime; // Because time squared
         // Get new YPosition
         float newFrameYPosition = this.transform.position.y + PlayerMovementValues.SpeedY;
-        float newFrameYFloorCheckCenterPosition = newFrameYPosition  - BoxYFloorPosition;
+        float newFrameYFloorCheckCenterPosition = newFrameYPosition - BoxYFloorPosition;
         // We get the position of floor collision based on character size
+        if (PlayerCurrentGlobalAction == PlayerGlobalActionState.Jump)
+        {
+            Debug.Log("Current speed Y = " + PlayerMovementValues.SpeedY);
+        }
+
 
         // Jumping on to the platforms
         // When player falls or stays at same height, we make them collide with platforms
-        if(PlayerMovementValues.SpeedY <= 0)
+        if (PlayerMovementValues.SpeedY <= 0)
         {
             LayerToIgnoreFloorCollision = -1;
         }
@@ -668,11 +642,12 @@ public class PlayerMovement : MonoBehaviour
         }
 
         // Falling through platforms
-        if(fallThrough)
+        if (fallThrough)
         {
             // Simple timer to give player time to fall through the platform
             fallThroughCurTime++;
-            if(fallThroughCurTime >= FallThroughTime) {
+            if (fallThroughCurTime >= FallThroughTime)
+            {
                 fallThroughCurTime = 0;
                 fallThrough = false;
             }
@@ -690,7 +665,7 @@ public class PlayerMovement : MonoBehaviour
             Vector2 oldPos = new Vector2(lastFrameXPosition, lastFrameYPosition - BoxYFloorPosition);
 
             RaycastHit2D rayBox = Physics2D.BoxCast(newPos, new Vector2(BoxXCollisionSize, BoxYFloorCollisionCheck), 0, newPos - oldPos, Vector2.Distance(newPos, oldPos));
-            if(rayBox.collider != null)
+            if (rayBox.collider != null)
             {
                 floorCollision = rayBox.collider;
             }
@@ -702,8 +677,8 @@ public class PlayerMovement : MonoBehaviour
             PlayerCurrentAirState = PlayerAirState.Air;
             // Update animation
             animator.SetBool("isLanded", false);
-            
-            if(PlayerCurrentCoyotteState == PlayerCoyotteState.None)
+
+            if (PlayerCurrentCoyotteState == PlayerCoyotteState.None)
             {
                 PlayerCurrentCoyotteState = PlayerCoyotteState.Coyotte;
             }
@@ -714,7 +689,7 @@ public class PlayerMovement : MonoBehaviour
             //PlayerCurrentJumpState = PlayerJumpState.JumpStopped;
             PlayerCurrentAirState = PlayerAirState.Grounded;
             // Reset fall through
-           // fallThrough = false;
+            // fallThrough = false;
             // Set player to be just above the ground
             newFrameYPosition = floorCollision.bounds.max.y + BoxYCollisionSize * 0.5f;
             // Set animation as landed
@@ -741,15 +716,6 @@ public class PlayerMovement : MonoBehaviour
                     newFrameXPosition = this.transform.position.x + HorizontalMovementSpeedMultiplier * DashSpeedMultiplier * FixedOrientation;
                 }
                 break;
-            case PlayerDashState.EndDash:
-                {
-                    animator.SetBool("animDash", false);
-                    PlayerMovementValues.SpeedY = 0;
-                    PlayerCurrentDashState = PlayerDashState.None;
-                    // Reset global action to not be dash anymore
-                    PlayerCurrentGlobalAction = PlayerGlobalActionState.None;
-                }
-                break;
         }
 
 
@@ -769,16 +735,16 @@ public class PlayerMovement : MonoBehaviour
         Collider2D[] xCollision = Physics2D.OverlapBoxAll(new Vector2(newFrameXPosition, newFrameYPosition), new Vector2(BoxXCollisionSize, BoxYCollisionSize * 0.9f), 0f);
         Collider2D xWallCollision = null;
         // And getting only the wall collider from them
-       for (int i = 0; i < xCollision.Length; i++)
-       {
-                    if (xCollision[i].gameObject.layer != 6)
-                    {
-                        xWallCollision = xCollision[i];
-                        break;
-                    }
-                }
-        
-       // Check the Orientation and if while grabbing a wall, player moves from the wall, stom wall grab
+        for (int i = 0; i < xCollision.Length; i++)
+        {
+            if (xCollision[i].gameObject.layer != 6)
+            {
+                xWallCollision = xCollision[i];
+                break;
+            }
+        }
+
+        // Check the Orientation and if while grabbing a wall, player moves from the wall, stom wall grab
         //if (CurrentOrientation == -WallOrientation&& isWallClimb)
         //{
         //    //In that case no more wall climb
@@ -787,7 +753,7 @@ public class PlayerMovement : MonoBehaviour
         //    canWallJump = false;
         //    // But have some grace coyotte time for jumping (cur 5 frames)
         //    isCoyotte = true;
-    
+
         //    animator.SetBool("animWallWait", false);
         //}
         // As walls are strictrly perbendicular to the ground, if there is a wall
@@ -840,33 +806,33 @@ public class PlayerMovement : MonoBehaviour
         //    animator.SetBool("animWallWait", true);
         //}
 
-        switch (PlayerCurrentWallGrab)
-        {
-            case PlayerWallGrab.Grabbed:
-                {
-                    PlayerMovementValues.SpeedY = 0;
-                    newFrameYPosition = transform.position.y;
-                    if (CurrentInput != CurrentWallPosition)
-                    {
-                        PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToCoyotte;
-                    }
-                    if (Input.GetKeyDown(KeyCode.Space))
-                    {
-                        PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToJump;
-                    }
-                }
-                break;
-            case PlayerWallGrab.EndGrabToJump:
-                {
+        //switch (PlayerCurrentWallGrab)
+        //{
+        //    case PlayerWallGrab.Grabbed:
+        //        {
+        //            PlayerMovementValues.SpeedY = 0;
+        //            newFrameYPosition = transform.position.y;
+        //            if (CurrentInput != CurrentWallPosition)
+        //            {
+        //                PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToCoyotte;
+        //            }
+        //            if (Input.GetKeyDown(KeyCode.Space))
+        //            {
+        //                PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToJump;
+        //            }
+        //        }
+        //        break;
+        //    case PlayerWallGrab.EndGrabToJump:
+        //        {
 
-                }
-                break;
-            case PlayerWallGrab.EndGrabToCoyotte:
-                {
+        //        }
+        //        break;
+        //    case PlayerWallGrab.EndGrabToCoyotte:
+        //        {
 
-                }
-                break;
-        }
+        //        }
+        //        break;
+        //}
 
         // While we are landed we are not falling and not in the air
         //if (isGrounded)
@@ -904,6 +870,6 @@ public class PlayerMovement : MonoBehaviour
     /// </summary>
     /// 
 
-    
+
 
 }
