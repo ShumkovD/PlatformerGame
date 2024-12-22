@@ -242,6 +242,55 @@ public class PlayerMovement : MonoBehaviour
         /// </summary>
 
 
+        switch (PlayerCurrentCoyotteState)
+        {
+            case PlayerCoyotteState.None:
+                {
+                }
+                break;
+            case PlayerCoyotteState.Coyotte:
+                {
+                    // Coyotte Timer Check
+                    curCoyotteTime += Time.deltaTime;
+                    if (CoyotteTime <= curCoyotteTime)
+                    {
+                        PlayerCurrentCoyotteState = PlayerCoyotteState.CoyotteEnd;
+                    }
+
+
+
+                    // Resetting Coyotte
+                    if (PlayerCurrentAirState == PlayerAirState.Grounded ||
+                       PlayerCurrentWallGrab == PlayerWallGrab.Grabbed)
+                    {
+                        PlayerCurrentCoyotteState = PlayerCoyotteState.CoyotteEnd;
+                    }
+                }
+                break;
+            case PlayerCoyotteState.CoyotteEnd:
+                {
+                    curCoyotteTime = 0;
+                }
+                break;
+        }
+
+
+        // If input is in the direction of the wall
+        if (CurrentInput == CurrentWallPosition &&
+            // Where is a wall collision
+            CurrentWallPosition != 0 &&
+            // And character is in the position to logically grab the ledge / wall
+            MaxYPosOfAWall >= this.transform.position.y + HandReachYHeight &&
+             //And at last player is falling
+             PlayerMovementValues.SpeedY < 0 &&
+             // And is not on the ground
+             PlayerCurrentAirState == PlayerAirState.Air
+            )
+        {
+            // Start Grabbing the ledge
+            PlayerCurrentGlobalAction = PlayerGlobalActionState.WallGrabbing;
+            PlayerCurrentJumpState = PlayerJumpState.None;
+        }
 
         // Here process all the actions for player to do
         switch (PlayerCurrentGlobalAction)
@@ -432,7 +481,54 @@ public class PlayerMovement : MonoBehaviour
                 break;
             case PlayerGlobalActionState.WallGrabbing:
                 {
+                    // Player Wall Grabbing
+                    switch (PlayerCurrentWallGrab)
+                    {
+                        case PlayerWallGrab.None:
+                            {
+                                Debug.Log("Inp: " + CurrentInput + " | Wall: " + CurrentWallPosition + "\n" +
+                                                   "Speed Y: " + PlayerMovementValues.SpeedY);
 
+                                PlayerCurrentWallGrab = PlayerWallGrab.StartGrab;
+                            }
+                            break;
+                        case PlayerWallGrab.StartGrab:
+                            {
+                                animator.SetBool("animWallWait", true);
+                                PlayerCurrentWallGrab = PlayerWallGrab.Grabbed;
+                                WallOrientation = CurrentWallPosition;
+                            }
+                            break;
+                        case PlayerWallGrab.Grabbed:
+                            {
+                                if (CurrentInput == -WallOrientation)
+                                {
+                                    PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToCoyotte;
+                                }
+
+                                if (jumpWasPressed)
+                                {
+                                    PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToJump;
+                                }
+                            }
+                            break;
+                        case PlayerWallGrab.EndGrabToJump:
+                            {
+                                animator.SetBool("animWallWait", false);
+                                PlayerCurrentWallGrab = PlayerWallGrab.None;
+                                PlayerCurrentGlobalAction = PlayerGlobalActionState.Jump;
+                            }
+                            break;
+                        case PlayerWallGrab.EndGrabToCoyotte:
+                            {
+                                animator.SetBool("animWallWait", false);
+                                PlayerCurrentWallGrab = PlayerWallGrab.None;
+                                // Set Coyotte On
+                                PlayerCurrentCoyotteState = PlayerCoyotteState.Coyotte;
+                                PlayerCurrentGlobalAction = PlayerGlobalActionState.None;
+                            }
+                            break;
+                    }
                 }
                 break;
             case PlayerGlobalActionState.Attacking:
@@ -499,103 +595,6 @@ public class PlayerMovement : MonoBehaviour
                 break;
         }
 
-
-        //// Player Air
-        //switch (PlayerCurrentAirState)
-        //{
-
-        //        {
-        //            // Player Wall Grabbing
-        //            switch (PlayerCurrentWallGrab)
-        //            {
-        //                case PlayerWallGrab.None:
-        //                    {
-        //                        // If input is in the direction of the wall
-        //                        if (CurrentInput == CurrentWallPosition &&
-        //                            // Where is a wall collision
-        //                            CurrentWallPosition != 0 &&
-        //                            // And character is in the position to logically grab the ledge / wall
-        //                            MaxYPosOfAWall >= this.transform.position.y + HandReachYHeight &&
-        //                             //And at last player is falling
-        //                             PlayerMovementValues.SpeedY <= 0
-        //                            )
-        //                        {
-        //                            // Start Grabbing the ledge
-        //                            PlayerCurrentWallGrab = PlayerWallGrab.StartGrab;
-        //                        }
-        //                    }
-        //                    break;
-        //                case PlayerWallGrab.StartGrab:
-        //                    {
-        //                        animator.SetBool("animWallWait", true);
-        //                        PlayerCurrentWallGrab = PlayerWallGrab.Grabbed;
-        //                        WallOrientation = CurrentWallPosition;
-        //                    }
-        //                    break;
-        //                case PlayerWallGrab.Grabbed:
-        //                    {
-        //                        if (CurrentInput == -WallOrientation)
-        //                        {
-        //                            PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToCoyotte;
-        //                        }
-        //                        if (Input.GetKeyDown(KeyCode.Space))
-        //                        {
-        //                            PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToJump;
-        //                        }
-        //                    }
-        //                    break;
-        //                case PlayerWallGrab.EndGrabToJump:
-        //                    {
-        //                        animator.SetBool("animWallWait", false);
-        //                        PlayerCurrentWallGrab = PlayerWallGrab.None;
-        //                    }
-        //                    break;
-        //                case PlayerWallGrab.EndGrabToCoyotte:
-        //                    {
-        //                        animator.SetBool("animWallWait", false);
-        //                        PlayerCurrentWallGrab = PlayerWallGrab.None;
-        //                        // Set Coyotte On
-        //                        PlayerCurrentCoyotteState = PlayerCoyotteState.Coyotte;
-        //                    }
-        //                    break;
-        //            }
-
-        //            switch (PlayerCurrentCoyotteState)
-        //            {
-        //                case PlayerCoyotteState.None:
-        //                    {
-        //                    }
-        //                    break;
-        //                case PlayerCoyotteState.Coyotte:
-        //                    {
-        //                        // Coyotte Timer Check
-        //                        curCoyotteTime += Time.deltaTime;
-        //                        if (CoyotteTime <= curCoyotteTime)
-        //                        {
-        //                            PlayerCurrentCoyotteState = PlayerCoyotteState.CoyotteEnd;
-        //                        }
-
-
-
-        //                        // Resetting Coyotte
-        //                        if (PlayerCurrentAirState   == PlayerAirState.Grounded ||
-        //                           PlayerCurrentWallGrab == PlayerWallGrab.Grabbed)
-        //                        {
-        //                            PlayerCurrentCoyotteState = PlayerCoyotteState.CoyotteEnd;
-        //                        }
-        //                    }
-        //                break;
-        //                case PlayerCoyotteState.CoyotteEnd:
-        //                    {
-        //                        curCoyotteTime = 0;
-        //                    }
-        //                    break;
-        //            }
-
-    
-
-
-
         // Here we change the sprite orientation
         if (CurrentOrientation > 0)
         {
@@ -611,7 +610,6 @@ public class PlayerMovement : MonoBehaviour
     // Physics and movement
     private void FixedUpdate()
     {
-
         if (PlayerCurrentGlobalAction == PlayerGlobalActionState.Attacking)
         {
             return;
@@ -622,12 +620,6 @@ public class PlayerMovement : MonoBehaviour
         // Get new YPosition
         float newFrameYPosition = this.transform.position.y + PlayerMovementValues.SpeedY;
         float newFrameYFloorCheckCenterPosition = newFrameYPosition - BoxYFloorPosition;
-        // We get the position of floor collision based on character size
-        if (PlayerCurrentGlobalAction == PlayerGlobalActionState.Jump)
-        {
-            Debug.Log("Current speed Y = " + PlayerMovementValues.SpeedY);
-        }
-
 
         // Jumping on to the platforms
         // When player falls or stays at same height, we make them collide with platforms
@@ -806,33 +798,17 @@ public class PlayerMovement : MonoBehaviour
         //    animator.SetBool("animWallWait", true);
         //}
 
-        //switch (PlayerCurrentWallGrab)
-        //{
-        //    case PlayerWallGrab.Grabbed:
-        //        {
-        //            PlayerMovementValues.SpeedY = 0;
-        //            newFrameYPosition = transform.position.y;
-        //            if (CurrentInput != CurrentWallPosition)
-        //            {
-        //                PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToCoyotte;
-        //            }
-        //            if (Input.GetKeyDown(KeyCode.Space))
-        //            {
-        //                PlayerCurrentWallGrab = PlayerWallGrab.EndGrabToJump;
-        //            }
-        //        }
-        //        break;
-        //    case PlayerWallGrab.EndGrabToJump:
-        //        {
 
-        //        }
-        //        break;
-        //    case PlayerWallGrab.EndGrabToCoyotte:
-        //        {
 
-        //        }
-        //        break;
-        //}
+        switch (PlayerCurrentWallGrab)
+        {
+            case PlayerWallGrab.Grabbed:
+                {
+                    PlayerMovementValues.SpeedY = 0;
+                    newFrameYPosition = transform.position.y;
+                }
+                break;
+        }
 
         // While we are landed we are not falling and not in the air
         //if (isGrounded)
