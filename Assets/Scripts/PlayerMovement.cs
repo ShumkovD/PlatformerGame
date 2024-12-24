@@ -74,6 +74,9 @@ public class PlayerMovement : MonoBehaviour
     private bool dashWasPressed = false;
     private bool attackWasPressed = false;
 
+    // Wall To Jump State fix
+    private bool wallGrabLocking = false;
+
     /// <summary>
     /// Used to communicate between Update and Fixed Update functions
     /// </summary>
@@ -284,7 +287,8 @@ public class PlayerMovement : MonoBehaviour
              //And at last player is falling
              PlayerMovementValues.SpeedY < 0 &&
              // And is not on the ground
-             PlayerCurrentAirState == PlayerAirState.Air
+             PlayerCurrentAirState == PlayerAirState.Air &&
+             !wallGrabLocking
             )
         {
             // Start Grabbing the ledge
@@ -362,6 +366,9 @@ public class PlayerMovement : MonoBehaviour
                         //TODO: Will need to fix the interruption and space input
                         case PlayerJumpState.JumpProgress:
                             {
+                                if (PlayerMovementValues.SpeedY > 0)
+                                    wallGrabLocking = false;
+
                                 // In case of dash being pressed, Jump is being ended in to the dash.
                                 if (dashWasPressed)
                                 {
@@ -486,9 +493,6 @@ public class PlayerMovement : MonoBehaviour
                     {
                         case PlayerWallGrab.None:
                             {
-                                Debug.Log("Inp: " + CurrentInput + " | Wall: " + CurrentWallPosition + "\n" +
-                                                   "Speed Y: " + PlayerMovementValues.SpeedY);
-
                                 PlayerCurrentWallGrab = PlayerWallGrab.StartGrab;
                             }
                             break;
@@ -517,6 +521,7 @@ public class PlayerMovement : MonoBehaviour
                                 animator.SetBool("animWallWait", false);
                                 PlayerCurrentWallGrab = PlayerWallGrab.None;
                                 PlayerCurrentGlobalAction = PlayerGlobalActionState.Jump;
+                                wallGrabLocking = true;
                             }
                             break;
                         case PlayerWallGrab.EndGrabToCoyotte:
@@ -680,6 +685,7 @@ public class PlayerMovement : MonoBehaviour
         {
             //PlayerCurrentJumpState = PlayerJumpState.JumpStopped;
             PlayerCurrentAirState = PlayerAirState.Grounded;
+            wallGrabLocking = false;
             // Reset fall through
             // fallThrough = false;
             // Set player to be just above the ground
@@ -688,7 +694,6 @@ public class PlayerMovement : MonoBehaviour
             animator.SetBool("isLanded", true);
             animator.SetBool("animIsJumping", false);
             //// Is grounded
-            //isGrounded = true;
             ////Set speed to 0
             PlayerMovementValues.SpeedY = 0;
 
