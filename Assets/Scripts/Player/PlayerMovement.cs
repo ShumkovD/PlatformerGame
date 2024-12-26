@@ -1,9 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Security.Cryptography.X509Certificates;
-using Unity.VisualScripting;
 using UnityEngine;
-using static UnityEditor.Experimental.GraphView.GraphView;
 
 
 public class PlayerMovement : MonoBehaviour
@@ -47,11 +44,30 @@ public class PlayerMovement : MonoBehaviour
     private int currentAttackNum = 0;
 
     private int AttackOrientation = 0;
+
+
+    [SerializeField, Header("Breathing")]
+    Camera mainCamera;
+    
+    [SerializeField] float minZoom;
+    [SerializeField] float maxZoom;
+
+    // Targets are bigger than min and max zooms.
+    // They are used to control the power with which easing will be made
+    [SerializeField] float targetMinZoom;
+    [SerializeField] float targetMaxZoom;
+    // Zoom Speed
+    [SerializeField] float zoomSpeed;
+
+    [SerializeField] float movementMult;
     #endregion
 
+    [SerializeField, Header("Collisions")]
     public int LayerToIgnoreHeadCollision = 6;
     public int LayerToIgnoreFloorCollision = 6;
     public int LayerToIgnoreXCollision = 6;
+
+    [SerializeField, Header("Debug, States, etc...")]
 
     Animator animator;
     SpriteRenderer spriteRenderer;
@@ -61,6 +77,9 @@ public class PlayerMovement : MonoBehaviour
 
     private int CurrentInput = 0;
     private int CurrentWallPosition = 0; //1 is right, -1 is left to the player
+
+    private float CurrentCameraZoom;
+    private float TargetCameraZoom;
 
     /// <summary>
     /// Used for collision checks and smooth gameplay
@@ -73,6 +92,7 @@ public class PlayerMovement : MonoBehaviour
     private bool jumpWasPressed = false;
     private bool dashWasPressed = false;
     private bool attackWasPressed = false;
+    private bool focusWasPressed = false;
 
     // Wall To Jump State fix
     private bool wallGrabLocking = false;
@@ -108,6 +128,18 @@ public class PlayerMovement : MonoBehaviour
     }
     public PlayerCoyotteState PlayerCurrentCoyotteState = PlayerCoyotteState.None;
 
+
+    // Player coyotte state
+    public enum PlayerFocusState
+    {
+        None,
+        InFocusTransition,
+        Focus,
+        OutFocusTransition
+    }
+    public PlayerFocusState PlayerCurrentFocusState = PlayerFocusState.None;
+
+
     // Player global action state
     public enum PlayerGlobalActionState
     {
@@ -115,7 +147,8 @@ public class PlayerMovement : MonoBehaviour
         Jump,
         WallGrabbing,
         Dashing,
-        Attacking
+        Attacking,
+        Focus
     }
     public PlayerGlobalActionState PlayerCurrentGlobalAction = PlayerGlobalActionState.None;
 
@@ -206,6 +239,13 @@ public class PlayerMovement : MonoBehaviour
         jumpWasPressed = false;
         dashWasPressed = false;
         attackWasPressed = false;
+        focusWasPressed = false;
+
+        if(Input.GetKeyDown(KeyCode.LeftControl))
+        {
+            focusWasPressed = true;
+        }
+
         // Fall through
         if (Input.GetKey(KeyCode.S))
         {
@@ -302,6 +342,15 @@ public class PlayerMovement : MonoBehaviour
             // Here process all the inputs to change the states
             case PlayerGlobalActionState.None:
                 {
+
+                    if(focusWasPressed)
+                    {
+                        // Reset is probably not needed, but to keep things clean will put it here
+                        focusWasPressed = false;
+
+                        PlayerCurrentGlobalAction = PlayerGlobalActionState.Focus;
+                        break;
+                    }
                     //Jump was pressed, 
                     if (jumpWasPressed)
                     {
@@ -334,7 +383,7 @@ public class PlayerMovement : MonoBehaviour
                     }
                 }
                 break;
-
+            
             // Player global jumping state
             case PlayerGlobalActionState.Jump:
                 {
@@ -442,6 +491,7 @@ public class PlayerMovement : MonoBehaviour
                             break;
                     }
                 }
+                break;
                 break;
             case PlayerGlobalActionState.Dashing:
                 {
@@ -598,10 +648,51 @@ public class PlayerMovement : MonoBehaviour
                     }
                 }
                 break;
-        }
+            case PlayerGlobalActionState.Focus:
+                {
+                    switch (PlayerCurrentFocusState)
+                    {
+                        case PlayerFocusState.None:
+                            {
+                                PlayerCurrentFocusState = PlayerFocusState.InFocusTransition;
+                            }
+                            break;
+                        case PlayerFocusState.InFocusTransition:
+                            {
+                                mainCamera.orthographicSize =  Mathf.Lerp(mainCamera.orthographicSize, targetMinZoom, zoomSpeed * Time.deltaTime);
+                                if(mainCamera.orthographicSize < minZoom)
+                                {
+                                    mainCamera.orthographicSize = minZoom;
+                                    PlayerCurrentFocusState = PlayerFocusState.Focus;
+                                }
+                            }
+                            break;
+                        case PlayerFocusState.Focus:
+                            {
+                                if(focusWasPressed)
+                                {
+                                    PlayerCurrentFocusState = PlayerFocusState.OutFocusTransition;
+                                }
+                            }
+                            break;
+                        case PlayerFocusState.OutFocusTransition:
+                            {
+                                 mainCamera.orthographicSize = Mathf.Lerp(mainCamera.orthographicSize, targetMaxZoom, zoomSpeed * Time.deltaTime);
+                                if (mainCamera.orthographicSize >= maxZoom)
+                                {
+                                    mainCamera.orthographicSize = maxZoom;
+                                    PlayerCurrentFocusState = PlayerFocusState.None;
+                                    PlayerCurrentGlobalAction = PlayerGlobalActionState.None;
+                                }
+                            }
+                            break;
+                    }
+                    break;
+                }
+                }
 
-        // Here we change the sprite orientation
-        if (CurrentOrientation > 0)
+                // Here we change the sprite orientation
+                if (CurrentOrientation > 0)
         {
             spriteRenderer.flipX = false;
         }

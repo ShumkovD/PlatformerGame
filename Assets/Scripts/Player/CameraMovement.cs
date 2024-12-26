@@ -10,17 +10,20 @@ public class CameraMovement : MonoBehaviour
     public Transform LeftLowBorder;
     public Transform RightTopBorder;
 
+    private Camera m_Camera;
 
     float vertExtent;
     float horzExtent;
     private void Start()
     {
-        vertExtent = GetComponent<Camera>().orthographicSize;
-        horzExtent = vertExtent * Screen.width / Screen.height;
+        m_Camera = GetComponent<Camera>();
     }
     // Update is called once per frame
     void Update()
     {
+        vertExtent = m_Camera.orthographicSize;
+        horzExtent = vertExtent * Screen.width / Screen.height;
+
         Vector3 newPosition = new Vector3(target.position.x, target.position.y, transform.position.z);
         if(newPosition.y - vertExtent < LeftLowBorder.position.y)
         {
@@ -32,7 +35,7 @@ public class CameraMovement : MonoBehaviour
             newPosition.x = horzExtent + LeftLowBorder.position.x;
         }
 
-        if (newPosition.y + vertExtent > RightTopBorder.position.y)
+        if (newPosition.y + vertExtent    > RightTopBorder.position.y)
         {
             newPosition.y = RightTopBorder.position.y - vertExtent;
         }

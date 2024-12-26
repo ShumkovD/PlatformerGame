@@ -2641,7 +2641,7 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.3
+  near clip plane: 0
   far clip plane: 1000
   field of view: 60
   orthographic: 1
@@ -5260,11 +5260,20 @@ MonoBehaviour:
   FallThroughTime: 5
   HandReachYHeight: 1
   comboTime: 0.25
+  mainCamera: {fileID: 519420031}
+  minZoom: 1.5
+  maxZoom: 5
+  targetMinZoom: 0.5
+  targetMaxZoom: 6
+  zoomSpeed: 0.2
+  movementMult: 0
   LayerToIgnoreHeadCollision: 6
   LayerToIgnoreFloorCollision: 6
   LayerToIgnoreXCollision: 6
+  animator: {fileID: 0}
   PlayerCurrentAirState: 0
   PlayerCurrentCoyotteState: 0
+  PlayerCurrentFocusState: 0
   PlayerCurrentGlobalAction: 0
   PlayerCurrentJumpState: 0
   PlayerCurrentWallGrab: 0
