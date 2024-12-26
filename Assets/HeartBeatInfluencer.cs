@@ -8,11 +8,11 @@ public class HeartBeatInfluencer : MonoBehaviour
     Transform PlayerObject;
 
     [SerializeField] float EffectRadius;
-    [SerializeField] float ChangePerSecond; //3 -> 1 = 5
+    [SerializeField] float ChangePerSecond; //0.2 -> 5s= 1hb
 
     private void Awake()
     {
-         HBSystem = GameObject.Find("GlobalHeartBeatSystem").GetComponent<HeartbeatSystem>();
+         HBSystem = GameObject.Find("HeartbeatSystem").GetComponent<HeartbeatSystem>();
          PlayerObject = GameObject.Find("PlayerObject").transform;
     }
 
